@@ -2,20 +2,22 @@
 import Head from "next/head";
 import { getTranslations as t } from "../locales";
 import "../public/assets/styles/style.css";
-import { ThemeProvider } from "@mui/material/styles";
-import { Theme, checkTheme } from "../src/config/Theme";
+import { AppearanceProvider } from "../src/config/Theme";
+import { LocaleProvider, useLocale } from "../locales";
+import { WorkflowProvider } from "../src/components/WorkflowContext";
 // import { makeStyles, useTheme } from "@mui/styles";
 //check wether the user prefers/chose dark theme
-checkTheme();
 
-function MyApp({ Component, pageProps }) {
+
+function AppContent({ Component, pageProps }) {
+  const { locale } = useLocale();
   return (
     <>
       <Head>
         <title>
-          {`Hatsmith - ${t("sub_title")}`}
+          {`Veli - ${t("sub_title")}`}
         </title>
-        <link rel="icon" href="/assets/images/logo_new.png" />
+        <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
 
         <meta charSet="utf-8" />
         <meta name="viewport" content="width=device-width, initial-scale=1" />
@@ -38,11 +40,13 @@ function MyApp({ Component, pageProps }) {
           media="(prefers-color-scheme: dark)"
         />
       </Head>
-      <ThemeProvider theme={Theme}>
-        <Component {...pageProps} />
-      </ThemeProvider>
+      <AppearanceProvider>
+        <WorkflowProvider key={locale}><Component {...pageProps} /></WorkflowProvider>
+      </AppearanceProvider>
     </>
   );
 }
 
-export default MyApp;
+export default function MyApp(props) {
+  return <LocaleProvider><AppContent {...props} /></LocaleProvider>;
+}

@@ -1,99 +1,20 @@
-import { useState } from "react";
-import { makeStyles } from "@mui/styles";
-import Dialog from "@mui/material/Dialog";
-import DialogActions from "@mui/material/DialogActions";
-import DialogContent from "@mui/material/DialogContent";
-import DialogContentText from "@mui/material/DialogContentText";
-import DialogTitle from "@mui/material/DialogTitle";
-import Button from "@mui/material/Button";
-import IconButton from "@mui/material/IconButton";
+import { useId, useState } from "react";
+import { Button, Dialog, DialogActions, DialogContent, DialogTitle, IconButton, Stack, Typography } from "@mui/material";
 import SettingsIcon from "@mui/icons-material/Settings";
 import Language from "../config/Language";
 import { DarkMode } from "../config/Theme";
 import { getTranslations as t } from "../../locales";
-import Alert from "@mui/material/Alert";
-const useStyles = makeStyles((theme) => ({
-  topScrollPaper: {
-    alignItems: "start",
-    marginTop: "20vh",
-  },
-  topPaperScrollBody: {
-    verticalAlign: "middle",
-  },
-}));
-
-const Settings = () => {
-  const classes = useStyles();
+export default function Settings() {
   const [open, setOpen] = useState(false);
-
-  const handleClickOpen = () => {
-    setOpen(true);
-  };
-
-  const handleClose = () => {
-    setOpen(false);
-  };
-
-  return (
-    <>
-      <IconButton onClick={handleClickOpen}>
-        <SettingsIcon />
-      </IconButton>
-
-      <Dialog
-        maxWidth="sm"
-        fullWidth
-        open={open}
-        onClose={handleClose}
-        aria-labelledby="alert-dialog-title"
-        aria-describedby="alert-dialog-description"
-        PaperProps={{
-          elevation: 0,
-        }}
-        classes={{
-          scrollPaper: classes.topScrollPaper,
-          paperScrollBody: classes.topPaperScrollBody,
-        }}
-      >
-        <DialogTitle id="alert-dialog-title">{t('settings')}</DialogTitle>
-        <DialogContent>
-          <DialogContentText id="alert-dialog-description">
-            {t('change_language')} :
-          </DialogContentText>
-
-          <Language />
-          <Alert
-          className={classes.formControl}
-          severity="info"
-          action={
-            <Button
-              href="https://github.com/sh-dv/hat.sh/blob/master/TRANSLATION.md"
-              target="_blank"
-            >
-              {t("guide")}
-            </Button>
-          }
-        >
-          {t("help_translate")}
-        </Alert>
-
-          <DialogContentText
-            id="alert-dialog-description"
-            style={{ marginTop: 15 }}
-          >
-            {t('change_appearance')} :
-          </DialogContentText>
-
-          <DarkMode />
-        </DialogContent>
-        <DialogActions>
-          <Button onClick={handleClose} color="primary" autoFocus>
-            {t('close')}
-          </Button>
-        </DialogActions>
-      </Dialog>
-    </>
-  );
-};
-
-export default Settings;
+  const id = useId();
+  return <>
+    <IconButton aria-label={t("settings")} onClick={() => setOpen(true)}><SettingsIcon /></IconButton>
+    <Dialog maxWidth="xs" fullWidth open={open} onClose={() => setOpen(false)} aria-labelledby={id}>
+      <DialogTitle id={id}>{t("settings")}</DialogTitle>
+      <DialogContent><Stack spacing={2}>
+        <Language /><Typography variant="body2" color="text.secondary">{t("languages_notice")}</Typography><DarkMode />
+      </Stack></DialogContent>
+      <DialogActions><Button onClick={() => setOpen(false)}>{t("close")}</Button></DialogActions>
+    </Dialog>
+  </>;
+}

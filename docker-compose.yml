@@ -2,7 +2,7 @@ version: "3"
 
 services:
   web:
-    image: mrtechtroid/hatsmith
+    image: veli:local
     build:
       context: ./
       dockerfile: Dockerfile

@@ -1,201 +1,77 @@
+import { createContext, useContext, useEffect, useMemo, useState } from "react";
+import { createTheme, ThemeProvider } from "@mui/material/styles";
+import { CssBaseline, FormControlLabel, Switch } from "@mui/material";
 import { getStoredValue, setStoredValue } from "../utils/storage";
-import { createTheme } from "@mui/material/styles";
-import { FormControlLabel, Switch } from "@mui/material";
-import { useState } from "react";
 import { getTranslations as t } from "../../locales";
-import { border, styled } from '@mui/system';
-import { useEffect } from "react";
-export const Theme = createTheme({
-  palette: {
-    primary: {
-      main: "#464653",
-    },
-    custom:{
-    white: {
-      main: "#ffffff",
-    },
-
-    alabaster: {
-      main: "#fafafa",
-      dark: "#303030",
-    },
-
-    mountainMist: {
-      main: "#9791a1",
-    },
-    gallery: {
-      main: "#ebebeb",
-    },
-    cinnabar: {
-      main: "#e74c3c",
-    },
-    denim: {
-      main: "#1976d2",
-    },
-    hawkesBlue: {
-      main: "#d0e5f5",
-      light: "#e3f2fd",
-    },
-    mineShaft: {
-      main: "#3f3f3f",
-    },
-    emperor: {
-      main: "#525252",
-    },
-    mercury: {
-      main: "#e9e9e9",
-      light: "#f3f3f3",
-    },
-    alto: {
-      main: "#e1e1e1",
-      light: "#ebebeb",
-    },
-    flower: {
-      main: "#fdecea",
-      light: "#fadbd7",
-      text: "#611a15",
-    },
-    cottonBoll: {
-      main: "#e8f4fd",
-      light: "#c9e1f2",
-      text: "#0d3c61",
-    },
-    diamondBlack : {
-      main: "rgba(0, 0, 0, 0.54)",
-    }
-    }
-  },
-});
-
-
-
-const DarkModeSwitch = styled(Switch)(({ theme }) => ({
-  width: 60,
-  height: 34,
-  padding: 3,
-  marginLeft: 20,
-  '& .MuiSwitch-switchBase': {
-    padding: 4,
-    '&.Mui-checked': {
-      transform: 'translateX(26px)',
-      color: '#000',
-      '& + .MuiSwitch-track': {
-        opacity: 1,
-        backgroundColor: 'black',
-      },
-      '& .MuiSwitch-thumb': {
-        backgroundColor: 'transparent'
-      },
-      '& .MuiSwitch-thumb:before': {
-        content: '"🌙"',
+const AppearanceContext = createContext({ dark: false, toggle: () => {} });
+export const createAppTheme = (dark = false) => {
+  const background = dark ? "#121820" : "#f5f7fa";
+  const surface = dark ? "#1c2531" : "#ffffff";
+  const text = dark ? "#f0f4f8" : "#202b3b";
+  const muted = dark ? "#aebbc9" : "#58677a";
+  const soft = dark ? "#283443" : "#edf1f6";
+  return createTheme({
+    palette: {
+      mode: dark ? "dark" : "light",
+      primary: { main: dark ? "#8ab9ff" : "#2563d4", contrastText: dark ? "#10233e" : "#ffffff" },
+      background: { default: background, paper: surface }, text: { primary: text, secondary: muted },
+      divider: dark ? "#39485a" : "#dce3ec",
+      custom: {
+        white: { main: surface }, alabaster: { main: background, dark: background },
+        mountainMist: { main: muted }, gallery: { main: soft }, cinnabar: { main: dark ? "#ffb4ab" : "#b42318" },
+        denim: { main: dark ? "#8ab9ff" : "#2563d4" }, hawkesBlue: { main: soft, light: soft },
+        mineShaft: { main: text }, emperor: { main: text }, mercury: { main: soft, light: soft }, alto: { main: soft, light: soft },
+        flower: { main: dark ? "#442923" : "#fff0ed", light: soft, text: dark ? "#ffb4ab" : "#b42318" },
+        cottonBoll: { main: soft, light: soft, text: muted }, diamondBlack: { main: muted },
       },
     },
-  },
-  '& .MuiSwitch-thumb': {
-    backgroundColor: 'transparent',
-    width: 26,
-    height: 26,
-    borderRadius: '50%',
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'center',
-    fontSize: 18,
-    position: 'relative',
-    '&:before': {
-      content: '"☀️"',
-      position: 'absolute',
+    shape: { borderRadius: 16 },
+    typography: {
+      fontFamily: '"Roboto", "Apple SD Gothic Neo", "Malgun Gothic", system-ui, sans-serif',
+      h1: { fontSize: "2rem", fontWeight: 700, lineHeight: 1.35, letterSpacing: "-0.025em" },
+      h2: { fontSize: "1.5rem", fontWeight: 700, lineHeight: 1.4, letterSpacing: "-0.02em" },
+      h6: { fontWeight: 700 }, button: { textTransform: "none", fontWeight: 600, fontSize: "1rem" },
+      body1: { lineHeight: 1.65 }, body2: { lineHeight: 1.6 },
     },
-  },
-  '& .MuiSwitch-track': {
-    borderRadius: 34,
-    backgroundColor: 'grey',
-    opacity: 1,
-  },
-}));
-
-export const checkTheme = () => {
-  
-  if (typeof window !== "undefined") {
-    let darkMode = getStoredValue("darkTheme");
-
-    if (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) {
-      {
-        if(darkMode != 0) {
-          setStoredValue("darkTheme", "1");
-          document.querySelector("html").classList.add("darkStyle");
-        }
-      }
-    }
-
-    if (darkMode > 0) {
-      document.querySelector("html").classList.add("darkStyle");
-    }
-  }
-
-}
-
-export const DarkModeLight = () => {
-  const [checked, setchecked] = useState(false)
-  useEffect(() => {
-    if (typeof document !== "undefined") {
-      setchecked(document.querySelector("html").classList.contains("darkStyle"));
-    }
-  },[])
-  if (typeof window === "undefined") {
-    return;
-  }
-  if (typeof document === "undefined") {
-    return;
-  }
-  const changeTheme = () => {
-    {
-      if (!checked) {
-        setStoredValue("darkTheme", "1");
-        document.querySelector("html").classList.add("darkStyle");
-        setchecked(true)
-      } else {
-        setStoredValue("darkTheme", "0");
-        document.querySelector("html").classList.remove("darkStyle");
-        setchecked(false)
-      }
-    }
-  };
-
-  return (
-    <FormControlLabel
-      value="darkModeEnabled"
-      
-      control={<DarkModeSwitch checked={checked} onChange={()=>{changeTheme()}} />}
-    />
-  );
-}
-
-
-export const DarkMode = () => {
-  const [checked, setchecked] = useState(typeof document !== "undefined" && document.querySelector("html").classList.contains("darkStyle"))
-
-  const changeTheme = () => {
-    {
-      if (!checked) {
-        setStoredValue("darkTheme", "1");
-        document.querySelector("html").classList.add("darkStyle");
-        setchecked(true)
-      } else {
-        setStoredValue("darkTheme", "0");
-        document.querySelector("html").classList.remove("darkStyle");
-        setchecked(false)
-      }
-    }
-  };
-
-  return (
-    <FormControlLabel
-      value="darkModeEnabled"
-      control={<Switch color="primary" checked={checked}  onChange={() => changeTheme()} />}
-      label={t('dark_mode')}
-      labelPlacement="start"
-    />
-  );
+    components: {
+      MuiButton: { defaultProps: { disableElevation: true }, styleOverrides: {
+        root: { minHeight: 44, borderRadius: 12, padding: "10px 18px", whiteSpace: "normal" }, sizeLarge: { minHeight: 52 },
+      } },
+      MuiIconButton: { styleOverrides: { root: { minWidth: 44, minHeight: 44 } } },
+      MuiOutlinedInput: { styleOverrides: { root: { borderRadius: 12 } } },
+      MuiFormHelperText: { styleOverrides: { root: { marginLeft: 0, fontSize: "0.8125rem" } } },
+      MuiAlert: { styleOverrides: { root: { borderRadius: 12 }, message: { minWidth: 0, overflowWrap: "anywhere" } } },
+      MuiDialog: { styleOverrides: { paper: { backgroundImage: "none" } } },
+      MuiCssBaseline: { styleOverrides: { body: { wordBreak: "keep-all", overflowWrap: "anywhere" }, "button:focus-visible, a:focus-visible, [tabindex]:focus-visible": {
+        outline: "3px solid", outlineColor: dark ? "#8ab9ff" : "#2563d4", outlineOffset: 3,
+      } } },
+    },
+  });
 };
-
-
+export const Theme = createAppTheme();
+export function AppearanceProvider({ children }) {
+  const [dark, setDark] = useState(false);
+  useEffect(() => {
+    const media = window.matchMedia("(prefers-color-scheme: dark)");
+    const apply = () => {
+      const stored = getStoredValue("darkTheme");
+      setDark(stored === "1" || (stored !== "0" && media.matches));
+    };
+    apply();
+    media.addEventListener("change", apply);
+    return () => media.removeEventListener("change", apply);
+  }, []);
+  const toggle = () => setDark(current => {
+    setStoredValue("darkTheme", current ? "0" : "1");
+    return !current;
+  });
+  const theme = useMemo(() => createAppTheme(dark), [dark]);
+  return <AppearanceContext.Provider value={{ dark, toggle }}><ThemeProvider theme={theme}>
+    <CssBaseline />{children}
+  </ThemeProvider></AppearanceContext.Provider>;
+}
+export function DarkMode() {
+  const { dark, toggle } = useContext(AppearanceContext);
+  return <FormControlLabel label={t("dark_mode")} control={<Switch checked={dark} onChange={toggle} />} />;
+}
+export const DarkModeLight = DarkMode;

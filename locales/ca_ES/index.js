@@ -16,7 +16,7 @@ const ca_ES = {
   faq: "PMF",
   technical_details: "Detalls tècnics",
   changelog: "Registre de canvis",
-  donation_message: "Us agrada el Hatsmith? Podeu fer una donació per a donar suport al projecte.",
+  donation_message: "Us agrada el Veli? Podeu fer una donació per a donar suport al projecte.",
 
   // Settings
   settings: "Configuració",
@@ -31,7 +31,7 @@ const ca_ES = {
   reset: "Restableix",
   guide: "Guia",
   multiple_tabs_alert: "Alerta de pestanyes múltiples",
-  multiple_tabs_alert_notice_one: "Sembla que el Hatsmith ja es troba obert en altra finestra o pestanya.",
+  multiple_tabs_alert_notice_one: "Sembla que el Veli ja es troba obert en altra finestra o pestanya.",
   multiple_tabs_alert_notice_two: "Eviteu xifrar o desxifrar fitxers en diferents pestanyes alhora.",
   understand: "HO ENTENC",
 
@@ -121,8 +121,8 @@ const ca_ES = {
   choose_files_dec: "Trieu els fitxers per desxifrar",
   sender_key_loaded: "S'ha carregat la clau pública del remitent, seleccioneu el fitxer xifrat.",
   recipient_key_loaded: "S'ha carregat la clau pública del destinatari, seleccioneu el fitxer per xifrar.",
-  file_not_encrypted_corrupted: "El fitxer no s'ha xifrat amb el Hatsmith, o podria estar malmès!",
-  old_version: "El fitxer es va xifrar amb una versió antiga del Hatsmith, el podeu desxifrar si aneu a la versió 1 de l'aplicació.",
+  file_not_encrypted_corrupted: "El fitxer no s'ha xifrat amb el Veli, o podria estar malmès!",
+  old_version: "El fitxer es va xifrar amb una versió antiga del Veli, el podeu desxifrar si aneu a la versió 1 de l'aplicació.",
   file_mixup: "Els fitxers per desxifrar han d'haver estat xifrats amb el mateix mètode, sigui amb contrasenya o amb clau pública. Trieu els fitxers corresponents.",
   enter_password_dec: "Introduïu la contrasenya de desxifratge",
   enter_keys_dec: "Introduïu la clau pública del remitent i la vostra clau privada",

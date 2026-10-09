@@ -1,6 +1,4 @@
-import { getStoredValue } from "../src/utils/storage";
 /* eslint-disable @next/next/no-html-link-for-pages */
-/* eslint-disable @next/next/no-img-element */
 import fs from "fs";
 import path from "path";
 import { marked } from "marked";
@@ -36,10 +34,8 @@ import LiveHelpIcon from "@mui/icons-material/LiveHelp";
 import HistoryIcon from "@mui/icons-material/History";
 import prism from "prismjs";
 import Settings from "../src/components/Settings";
-import { ThemeProvider } from "@mui/styles";
-import { Theme, checkTheme } from "../src/config/Theme";
 import locales from "../locales/locales";
-import { getTranslations as t } from "../locales";
+import { getTranslations as t, useLocale } from "../locales";
 const drawerWidth = 240;
 
 marked.setOptions({
@@ -229,51 +225,13 @@ const useStyles = makeStyles((theme) => ({
 export default function About(props) {
   const classes = useStyles();
   const theme = useTheme();
+  const { locale } = useLocale();
   const [mobileOpen, setMobileOpen] = useState(false);
   const [docContent, setDocContent] = useState("");
 
   useEffect(() => {
-    checkTheme();
-  }, []);
-
-  useEffect(() => {
-    const getLocale = () => {
-      if (typeof window !== "undefined") {
-        let language = getStoredValue("language");
-        let userLanguage = navigator.language.replace("-", "_");
-        return language ? language : locales[userLanguage] ? userLanguage : "en_US";
-      }
-    };
-
-    let languages = props.docs;
-    let langFilter = { lang: getLocale() };
-    let langResult;
-
-    languages.forEach(function (obj) {
-      let matches = true;
-      for (let key in langFilter) {
-        if (langFilter[key] !== obj[key]) {
-          matches = false;
-        }
-      }
-      if (matches) {
-        langResult = obj;
-      } else {
-        //default en docs
-        setDocContent(languages[0].content);
-      }
-    });
-
-    const getContent = async () => {
-      for (const key in langResult) {
-        if (key == "content") {
-          setDocContent(langResult[key]);
-        }
-      }
-    };
-
-    getContent();
-  }, [props.docs]);
+    setDocContent((props.docs.find(doc => doc.lang === locale) || props.docs[0]).content);
+  }, [props.docs, locale]);
 
   const handleDrawerToggle = () => {
     setMobileOpen(!mobileOpen);
@@ -289,7 +247,7 @@ export default function About(props) {
 
       <List>
         <ListItem button component="a">
-          <ListItemText primary="Hat.sh Documentation" />
+          <ListItemText primary="Veli Documentation" />
         </ListItem>
       </List>
 
@@ -334,7 +292,7 @@ export default function About(props) {
 
               <Typography variant="h6" className={classes.logo}>
                 <a href="/">
-                  <img src="/assets/images/logo_new.png" alt="logo" width="40" />
+                  Veli
                 </a>
               </Typography>
 
@@ -343,7 +301,8 @@ export default function About(props) {
               </Button>
 
               <IconButton
-                href="https://github.com/sh-dv/hat.sh"
+                aria-label="GitHub"
+                href="https://github.com/mksdr/Veli"
                 target="_blank"
                 rel="noopener"
               >

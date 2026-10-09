@@ -111,6 +111,7 @@ function installWorker(scope, sodium, config, streamTimeoutMs = 30000) {
     reply(client, {
       reply: kind === "encryption" ? "filePreparedEnc" : "filePreparedDec",
       downloadUrl: `/file?id=${id}`,
+      requestId: data.requestId,
     }, job);
   }
 

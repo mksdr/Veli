@@ -14,11 +14,11 @@ const minute = 60,
       century = year * 100;
 
 const strength = {
-  0: t("very_weak"),
-  1: t("weak"),
-  2: t("moderate"),
-  3: t("good"),
-  4: t("strong"),
+  0: "very_weak",
+  1: "weak",
+  2: "moderate",
+  3: "good",
+  4: "strong",
 };
 
 const display_time = (seconds) => {
@@ -61,7 +61,7 @@ const passwordStrengthCheck = (password) => {
   let crackTimeInSeconds = strengthResult.crackTimesSeconds.offlineSlowHashing1e4PerSecond;
   let crackTime = display_time(crackTimeInSeconds);
 
-  return [strength[score], crackTime];
+  return [t(strength[score]), crackTime];
 };
 
 export default passwordStrengthCheck;

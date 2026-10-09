@@ -1,4 +1,4 @@
-import { makeStyles } from "@mui/styles";
+import { Box } from "@mui/material";
 import NavAppBar from "../components/AppBar";
 import Hero from "../components/Hero";
 import Panels from "../components/Panels";
@@ -9,7 +9,7 @@ import Footer from "../components/Footer";
 const MainContainer = () => {
 
   return (
-    <div sx={{
+    <Box sx={{
         backgroundColor: (theme) => theme.palette.custom?.alabaster?.main || "#fff",
         minHeight: "100vh",
         display: "flex",
@@ -19,7 +19,7 @@ const MainContainer = () => {
       <Hero />
       <Panels />
       <Footer />
-    </div>
+    </Box>
   );
 };
 

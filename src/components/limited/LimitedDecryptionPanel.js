@@ -1,150 +1,13 @@
-import { downloadBlob } from "../../utils/downloadBlob";
-import { decryptFile } from "../../utils/decryptFile";
-/* eslint-disable @next/next/no-img-element */
 import { useState, useEffect } from "react";
 import { useRouter } from "next/router";
 import { useDropzone } from "react-dropzone";
-import { formatBytes } from "../../helpers/formatBytes";
-import { formatName } from "../../helpers/formatName";
-import {
-  crypto_secretstream_xchacha20poly1305_ABYTES,
-  MAX_FILE_SIZE,
-  CHUNK_SIZE,
-  SIGNATURES,
-  decoder,
-} from "../../config/Constants";
-import { Alert, AlertTitle } from "@mui/material";
-import { makeStyles } from "@mui/styles";
-import Grid from "@mui/material/Grid";
-import Stepper from "@mui/material/Stepper";
-import Step from "@mui/material/Step";
-import StepLabel from "@mui/material/StepLabel";
-import StepContent from "@mui/material/StepContent";
-import Button from "@mui/material/Button";
-import Paper from "@mui/material/Paper";
-import Typography from "@mui/material/Typography";
-import TextField from "@mui/material/TextField";
-import Backdrop from "@mui/material/Backdrop";
-import CircularProgress from "@mui/material/CircularProgress";
-import IconButton from "@mui/material/IconButton";
-import Tooltip from "@mui/material/Tooltip";
-import Collapse from "@mui/material/Collapse";
-import RefreshIcon from "@mui/icons-material/Refresh";
-import DescriptionIcon from "@mui/icons-material/Description";
-import GetAppIcon from "@mui/icons-material/GetApp";
-import Visibility from "@mui/icons-material/Visibility";
-import VisibilityOff from "@mui/icons-material/VisibilityOff";
-import AttachFileIcon from "@mui/icons-material/AttachFile";
-import CloseIcon from "@mui/icons-material/Close";
-import {
-  List,
-  ListItem,
-  ListItemSecondaryAction,
-  ListItemText,
-} from "@mui/material";
-import DeleteIcon from "@mui/icons-material/Delete";
-import InfoIcon from "@mui/icons-material/Info";
-import FileInfoDialog from "../FileInfoDialog";
+import FileWorkflow from "../FileWorkflow";
 import { getTranslations as t } from "../../../locales";
-
+import { downloadBlob } from "../../utils/downloadBlob";
 const _sodium = require("libsodium-wrappers");
-
-const useStyles = makeStyles((theme) => ({
-  root: {
-    width: "100%",
-  },
-  offline: {
-    fontSize: 12,
-    float: "right",
-    color: theme.palette.custom.diamondBlack.main,
-  },
-  stepper: {
-    backgroundColor: "transparent",
-  },
-  stepIcon: {
-    "&$activeStepIcon": {
-      color: theme.palette.custom.emperor.main,
-    },
-    "&$completedStepIcon": {
-      color: theme.palette.custom.emperor.main,
-    },
-  },
-  activeStepIcon: {},
-  completedStepIcon: {},
-
-  button: {
-    marginTop: theme.spacing(1),
-    marginRight: theme.spacing(1),
-    borderRadius: "8px",
-    border: "none",
-    color: theme.palette.custom.mineShaft.main,
-    backgroundColor: theme.palette.custom.mercury.light,
-    "&:hover": {
-      backgroundColor: theme.palette.custom.mercury.main,
-    },
-    transition: "background-color 0.2s ease-out",
-    transition: "color .01s",
-  },
-
-  browseButton: {
-    padding: 8,
-    paddingLeft: 15,
-    paddingRight: 15,
-    textTransform: "none",
-    borderRadius: "8px",
-    border: "none",
-    color: theme.palette.custom.mineShaft.main,
-    backgroundColor: theme.palette.custom.alto.light,
-    "&:hover": {
-      backgroundColor: theme.palette.custom.alto.main,
-    },
-    transition: "background-color 0.2s ease-out",
-    transition: "color .01s",
-  },
-
-  backButton: {
-    marginTop: theme.spacing(1),
-    marginRight: theme.spacing(1),
-    borderRadius: "8px",
-    backgroundColor: theme.palette.custom.mercury.main,
-    transition: "color .01s",
-  },
-  nextButton: {
-    marginTop: theme.spacing(1),
-    marginRight: theme.spacing(1),
-    borderRadius: "8px",
-    backgroundColor: theme.palette.primary.main,
-    color: theme.palette.custom.white.main,
-    "&:hover": {
-      backgroundColor: theme.palette.custom.mineShaft.main,
-    },
-    transition: "color .01s",
-  },
-  actionsContainer: {
-    marginBottom: theme.spacing(2),
-  },
-  resetContainer: {
-    padding: theme.spacing(3),
-    boxShadow: "rgba(149, 157, 165, 0.4) 0px 8px 24px",
-    borderRadius: "8px",
-  },
-
-  input: {
-    display: "none",
-  },
-
-  fileArea: {
-    padding: "20px",
-    border: "5px dashed",
-    borderColor: theme.palette.custom.gallery.main,
-    borderRadius: "14px",
-    display: "flex",
-    alignItems: "center",
-    justifyContent: "center",
-    flexDirection: "column",
-    marginBottom: "10px",
-  },
-}));
+import { decryptFile } from "../../utils/decryptFile";
+import { formatName } from "../../helpers/formatName";
+import { MAX_FILE_SIZE, SIGNATURES, CHUNK_SIZE, decoder } from "../../config/Constants";
 
 let file,
   limitedDecIndex,
@@ -153,9 +16,8 @@ let file,
   decRx,
   decTx;
 
-const LimitedDecryptionPanel = () => {
-  const classes = useStyles();
-  useEffect(() => () => { limitedDecFileBuff = null; }, []);
+const LimitedDecryptionPanel = ({ active = true }) => {
+  useEffect(() => () => { limitedDecFileBuff = null; limitedTestDecFileBuff = null; file = null; decRx = null; decTx = null; }, []);
   const [operationError, setOperationError] = useState(false);
   const handleOperationError = () => {
     limitedDecFileBuff = null;
@@ -186,8 +48,6 @@ const LimitedDecryptionPanel = () => {
 
   const [PrivateKey, setPrivateKey] = useState();
 
-  const [showPrivateKey, setShowPrivateKey] = useState(false);
-
   const [wrongPublicKey, setWrongPublicKey] = useState(false);
 
   const [wrongPrivateKey, setWrongPrivateKey] = useState(false);
@@ -210,17 +70,15 @@ const LimitedDecryptionPanel = () => {
 
   const [isDecrypting, setIsDecrypting] = useState(false);
 
-  const [showPassword, setShowPassword] = useState(false);
-
   const [pkAlert, setPkAlert] = useState(false);
 
-  const { getRootProps, getInputProps, isDragActive } = useDropzone({
+  const { getRootProps, isDragActive } = useDropzone({
     onDrop: (acceptedFile) => {
       handleLimitedFileInput(acceptedFile[0]);
     },
     noClick: true,
     noKeyboard: true,
-    disabled: activeStep !== 0,
+    disabled: activeStep !== 0 || isCheckingFile || isTestingKeys || isTestingPassword || isDecrypting,
   });
 
   const handleNext = () => {
@@ -239,6 +97,7 @@ const LimitedDecryptionPanel = () => {
   };
 
   const handleReset = () => {
+    setLargeFile(false);
     limitedDecFileBuff = null;
     limitedTestDecFileBuff = null;
     setOperationError(false);
@@ -321,35 +180,9 @@ const LimitedDecryptionPanel = () => {
     setWrongPublicKey(false);
   };
 
-  const loadPublicKey = (file) => {
-    if (file) {
-      // files must be of text and size below 1 mb
-      if (file.size <= 1000000) {
-        const reader = new FileReader();
-        reader.readAsText(file);
-        reader.onload = () => {
-          setPublicKey(reader.result);
-        };
-      }
-    }
-  };
-
   const handlePrivateKeyInput = (selectedKey) => {
     setPrivateKey(selectedKey);
     setWrongPrivateKey(false);
-  };
-
-  const loadPrivateKey = (file) => {
-    if (file) {
-      // files must be of text and size below 1 mb
-      if (file.size <= 1000000) {
-        const reader = new FileReader();
-        reader.readAsText(file);
-        reader.onload = () => {
-          setPrivateKey(reader.result);
-        };
-      }
-    }
   };
 
   const requestDecKeyPair = async (ssk, cpk, header, decFileBuff) => {
@@ -622,483 +455,18 @@ const LimitedDecryptionPanel = () => {
       setDecryptionMethod("publicKey");
     }
   }, [query.publicKey, query.tab]);
-  const [selectedFile, setSelectedFile] = useState(null);
-  const [showInfo, setShowInfo] = useState(false);
-
-  const handleOpenInfo = (file) => {
-    setSelectedFile(file);
-    setShowInfo(true);
-  };
-
-  const handleCloseInfo = () => {
-    setShowInfo(false);
-    setSelectedFile(null);
-  };
-
-  return (
-    <div className={classes.root} {...getRootProps()}>
-      {operationError && <Alert severity="error">{t("file_processing_error")}</Alert>}
-      <Backdrop open={isDragActive} style={{ zIndex: 10 }}>
-        <Typography
-          variant="h2"
-          gutterBottom
-          style={{ color: "#fff", textAlign: "center" }}
-        >
-          <img
-            src="/assets/images/logo_new.png"
-            width="100"
-            height="100"
-            alt="hat.sh logo"
-          />
-          <br />
-          {t("drop_file_dec")}
-        </Typography>
-      </Backdrop>
-      <Collapse in={pkAlert} style={{ marginTop: 5 }}>
-        <Alert
-          severity="success"
-          action={
-            <IconButton
-              aria-label="close"
-              color="inherit"
-              size="small"
-              onClick={() => {
-                setPkAlert(false);
-              }}
-            >
-              <CloseIcon fontSize="inherit" />
-            </IconButton>
-          }
-        >
-          {t("sender_key_loaded")}
-        </Alert>
-      </Collapse>
-      <Stepper
-        activeStep={activeStep}
-        orientation="vertical"
-        className={classes.stepper}
-      >
-        <Step key={1}>
-          <StepLabel
-            StepIconProps={{
-              classes: {
-                root: classes.stepIcon,
-                active: classes.activeStepIcon,
-                completed: classes.completedStepIcon,
-              },
-            }}
-          >
-            {t("choose_file_dec")}
-          </StepLabel>
-          <StepContent>
-            <FileInfoDialog file={selectedFile} display={showInfo} onClose={handleCloseInfo} />
-            <div className="wrapper p-3" id="encFileWrapper">
-              <div className={classes.fileArea} id="encFileArea">
-                <Paper
-                  elevation={0}
-                  style={{
-                    overflow: "auto",
-                    maxHeight: "280px",
-                    backgroundColor: "transparent",
-                  }}
-                >
-                  <List
-                    dense={true}
-                    style={{
-                      display: "flex",
-                      flex: "1",
-                      flexWrap: "wrap",
-                      alignContent: "center",
-                      justifyContent: "center",
-                    }}
-                  >
-                    {File ? (
-                      <ListItem
-                        style={{
-                          backgroundColor: "#ebebeb",
-                          borderRadius: "8px",
-                          padding: 15,
-                        }}
-                      >
-                        <ListItemText
-                          style={{
-                            width: "200px",
-                            minHeight: "50px",
-                            maxHeight: "50px",
-                            textAlign: "center",
-                          }}
-                          primary={File.name}
-                          secondary={formatBytes(File.size)}
-                        />
-                        <ListItemSecondaryAction>
-                          <IconButton
-                            style={{ marginTop: 40 }}
-                            onClick={() => handleOpenInfo(file)}
-                            edge="end"
-                            aria-label="info"
-                          >
-                            <InfoIcon />
-                          </IconButton>
-                          <IconButton
-                            style={{ marginTop: 40 }}
-                            onClick={() => removeFile()}
-                            edge="end"
-                            aria-label="delete"
-                          >
-                            <DeleteIcon />
-                          </IconButton>
-                        </ListItemSecondaryAction>
-                      </ListItem>
-                    ) : (
-                      t("drag_drop")
-                    )}
-                  </List>
-                </Paper>
-
-                <input
-                  {...getInputProps()}
-                  className={classes.input}
-                  id="dec-file"
-                  type="file"
-                  onChange={(e) => handleLimitedFileInput(e.target.files[0])}
-                />
-                <label htmlFor="dec-file">
-                  <br />
-                  <Button
-                    className={classes.browseButton}
-                    component="span"
-                    startIcon={<DescriptionIcon />}
-                  >
-                    {File ? t("change_file") : t("browse_file")}
-                  </Button>
-                </label>
-              </div>
-            </div>
-
-            <div className={classes.actionsContainer}>
-              <div>
-                <Button
-                  disabled={isCheckingFile || !File}
-                  variant="contained"
-                  onClick={checkFile}
-                  className={`${classes.nextButton} nextBtnHs`}
-                  startIcon={
-                    isCheckingFile && (
-                      <CircularProgress
-                        size={24}
-                        className={classes.buttonProgress}
-                      />
-                    )
-                  }
-                  fullWidth
-                >
-                  {isCheckingFile ? t("checking_file") : t("next")}
-                </Button>
-
-                {largeFile && (
-                  <>
-                    <Alert severity="error" style={{ marginTop: 15 }}>
-                      <strong>{t("file_too_big")}</strong>{" "}
-                      {t("choose_file_1gb")}
-                    </Alert>
-                  </>
-                )}
-              </div>
-
-              {badFile && (
-                <Alert severity="error" style={{ marginTop: 15 }}>
-                  {t("file_not_encrypted_corrupted")}
-                </Alert>
-              )}
-
-              {oldVersion && (
-                <Alert severity="error" style={{ marginTop: 15 }}>
-                  {t("old_version")}{" "}
-                  <a href="https://web.archive.org/web/20211028050731/https://v1.hat.sh/" target="_blank" rel="noreferrer">
-                    {"https://v1.hat.sh (Archived)"}
-                  </a>
-                </Alert>
-              )}
-            </div>
-
-            {!badFile && !oldVersion && !largeFile && (
-              <Typography className={classes.offline}>
-                {t("offline_note")}
-              </Typography>
-            )}
-          </StepContent>
-        </Step>
-
-        <Step key={2}>
-          <StepLabel
-            StepIconProps={{
-              classes: {
-                root: classes.stepIcon,
-                active: classes.activeStepIcon,
-                completed: classes.completedStepIcon,
-              },
-            }}
-          >
-            {decryptionMethod === "secretKey"
-              ? t("enter_password_dec")
-              : t("enter_keys_dec")}
-          </StepLabel>
-          <StepContent>
-            {decryptionMethod === "secretKey" && (
-              <TextField
-                required
-                type={showPassword ? "text" : "password"}
-                error={wrongPassword ? true : false}
-                id={
-                  wrongPassword
-                    ? "outlined-error-helper-text"
-                    : "outlined-required"
-                }
-                label={wrongPassword ? t("error") : t("required")}
-                helperText={wrongPassword ? t("wrong_password") : ""}
-                placeholder={t("password")}
-                variant="outlined"
-                value={Password ? Password : ""}
-                onChange={(e) => handlePasswordInput(e.target.value)}
-                fullWidth
-                InputProps={{
-                  endAdornment: (
-                    <Tooltip title={t("show_password")} placement="left">
-                      <IconButton
-                        onClick={() => setShowPassword(!showPassword)}
-                      >
-                        {showPassword ? <Visibility /> : <VisibilityOff />}
-                      </IconButton>
-                    </Tooltip>
-                  ),
-                }}
-              />
-            )}
-
-            {decryptionMethod === "publicKey" && (
-              <>
-                <TextField
-                  required
-                  error={wrongPublicKey || keysError ? true : false}
-                  helperText={wrongPublicKey ? t("wrong_public_key") : ""}
-                  label={t("sender_public_key")}
-                  placeholder={t("enter_sender_public_key")}
-                  variant="outlined"
-                  value={PublicKey ? PublicKey : ""}
-                  onChange={(e) => handlePublicKeyInput(e.target.value)}
-                  fullWidth
-                  style={{ marginBottom: "15px" }}
-                  InputProps={{
-                    endAdornment: (
-                      <>
-                        <input
-                          accept=".public"
-                          className={classes.input}
-                          id="dec-public-key-file"
-                          type="file"
-                          onChange={(e) => loadPublicKey(e.target.files[0])}
-                        />
-                        <label htmlFor="dec-public-key-file">
-                          <Tooltip
-                            title={t("load_public_key")}
-                            placement="left"
-                          >
-                            <IconButton
-                              aria-label={t("load_public_key")}
-                              component="span"
-                            >
-                              <AttachFileIcon />
-                            </IconButton>
-                          </Tooltip>
-                        </label>
-                      </>
-                    ),
-                  }}
-                />
-
-                <TextField
-                  type={showPrivateKey ? "text" : "password"}
-                  required
-                  error={wrongPrivateKey || keysError ? true : false}
-                  helperText={wrongPrivateKey ? t("wrong_private_key") : ""}
-                  label={t("your_private_key_dec")}
-                  placeholder={t("enter_private_key_dec")}
-                  variant="outlined"
-                  value={PrivateKey ? PrivateKey : ""}
-                  onChange={(e) => handlePrivateKeyInput(e.target.value)}
-                  fullWidth
-                  style={{ marginBottom: "15px" }}
-                  InputProps={{
-                    endAdornment: (
-                      <>
-                        {PrivateKey && (
-                          <Tooltip
-                            title={t("show_private_key")}
-                            placement="left"
-                          >
-                            <IconButton
-                              onClick={() => setShowPrivateKey(!showPrivateKey)}
-                            >
-                              {showPrivateKey ? (
-                                <Visibility />
-                              ) : (
-                                <VisibilityOff />
-                              )}
-                            </IconButton>
-                          </Tooltip>
-                        )}
-
-                        <input
-                          accept=".private"
-                          className={classes.input}
-                          id="dec-private-key-file"
-                          type="file"
-                          onChange={(e) => loadPrivateKey(e.target.files[0])}
-                        />
-                        <label htmlFor="dec-private-key-file">
-                          <Tooltip
-                            title={t("load_private_key")}
-                            placement="left"
-                          >
-                            <IconButton
-                              aria-label={t("load_private_key")}
-                              component="span"
-                            >
-                              <AttachFileIcon />
-                            </IconButton>
-                          </Tooltip>
-                        </label>
-                      </>
-                    ),
-                  }}
-                />
-              </>
-            )}
-
-            <div className={classes.actionsContainer}>
-              <div>
-                <Grid container spacing={1}>
-                  <Grid item>
-                    <Button
-                      disabled={
-                        activeStep === 0 ||
-                        isTestingPassword ||
-                        isTestingKeys ||
-                        isDecrypting
-                      }
-                      onClick={handleBack}
-                      className={classes.backButton}
-                      fullWidth
-                    >
-                      {t("back")}
-                    </Button>
-                  </Grid>
-                  <Grid item xs>
-                    <Button
-                      disabled={
-                        (decryptionMethod === "secretKey" && !Password) ||
-                        (decryptionMethod === "publicKey" &&
-                          (!PublicKey || !PrivateKey)) ||
-                        isTestingPassword ||
-                        isTestingKeys ||
-                        isDecrypting
-                      }
-                      variant="contained"
-                      onClick={testLimitedDecryption}
-                      className={`${classes.nextButton} nextBtnHs`}
-                      startIcon={
-                        (isTestingPassword || isDecrypting) && (
-                          <CircularProgress
-                            size={24}
-                            className={classes.buttonProgress}
-                          />
-                        )
-                      }
-                      fullWidth
-                    >
-                      {isTestingPassword
-                        ? t("testing_password")
-                        : isTestingKeys
-                        ? t("testing_keys")
-                        : isDecrypting
-                        ? t("decrypting_file")
-                        : t("next")}
-                    </Button>
-                  </Grid>
-                </Grid>
-                <br />
-
-                {decryptionMethod === "publicKey" && keysError && (
-                  <Alert severity="error">{keysErrorMessage}</Alert>
-                )}
-
-                {isDecrypting && (
-                  <Alert variant="outlined" severity="info">
-                    {t("page_close_alert_dec")}
-                  </Alert>
-                )}
-              </div>
-            </div>
-          </StepContent>
-        </Step>
-
-        <Step key={3}>
-          <StepLabel
-            StepIconProps={{
-              classes: {
-                root: classes.stepIcon,
-                active: classes.activeStepIcon,
-                completed: classes.completedStepIcon,
-              },
-            }}
-          >
-            {t("download_decrypted_file")}
-          </StepLabel>
-        </Step>
-      </Stepper>
-
-      {activeStep === 2 && (
-        <Paper elevation={1} className={classes.resetContainer}>
-          <Alert
-            variant="outlined"
-            severity="success"
-            style={{ border: "none" }}
-          >
-            <AlertTitle>{t("success")}</AlertTitle>
-            {t("success_decrypted")}
-          </Alert>
-
-          <Grid container spacing={1} style={{ marginTop: 5 }}>
-            <Grid item xs={12}>
-              <Button
-                onClick={handleDecryptedFileDownload}
-                color="primary"
-                className={`${classes.nextButton} nextBtnHs`}
-                variant="contained"
-                startIcon={<GetAppIcon />}
-                fullWidth
-                style={{ textTransform: "none" }}
-              >
-                {t("download_file")}
-              </Button>
-            </Grid>
-            <Grid item xs={12}>
-              <Button
-                onClick={handleReset}
-                className={classes.button}
-                variant="outlined"
-                startIcon={<RefreshIcon />}
-                fullWidth
-                style={{ textTransform: "none" }}
-              >
-                {t("decrypt_another_file")}
-              </Button>
-            </Grid>
-          </Grid>
-        </Paper>
-      )}
-    </div>
-  );
-};
+  return <FileWorkflow
+    direction="decrypt" active={active} step={activeStep} done={activeStep === 2} buffered
+    files={File ? [File] : []} onFiles={selected => handleLimitedFileInput(selected[0])} onRemove={removeFile} onFileContinue={checkFile}
+    method={decryptionMethod} password={Password} onPassword={handlePasswordInput}
+    publicKey={PublicKey} privateKey={PrivateKey} onPublicKey={handlePublicKeyInput} onPrivateKey={handlePrivateKeyInput}
+    publicKeyError={wrongPublicKey} privateKeyError={wrongPrivateKey} keysError={keysError ? keysErrorMessage : null}
+    passwordError={wrongPassword} fileError={largeFile ? t("choose_file_1gb") : badFile ? t("file_not_encrypted_corrupted") : oldVersion ? t("old_version") : null} operationError={operationError}
+    checking={isCheckingFile} testing={isTestingPassword || isTestingKeys} processing={isDecrypting}
+    onCredentialContinue={testLimitedDecryption} onBack={handleBack} onReset={handleReset}
+    rootProps={getRootProps()} isDragActive={isDragActive} publicKeyNotice={pkAlert}
+    onDownload={handleDecryptedFileDownload}
+  />;
+}
 
 export default LimitedDecryptionPanel;

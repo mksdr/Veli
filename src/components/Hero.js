@@ -1,41 +1,12 @@
-/* eslint-disable @next/next/no-img-element */
-import { makeStyles } from "@mui/styles";
-import Container from "@mui/material/Container";
-import Typography from "@mui/material/Typography";
+import { Box, Container, Typography } from "@mui/material";
 import { getTranslations as t } from "../../locales";
-import VersionBadge from "./VersionBadge";
-const useStyles = makeStyles((theme) => ({
-  heroTitle: {
-    color: theme.palette.custom.diamondBlack.main,
-    marginTop: 20,
-  },
-  heroSubTitle: {
-    color: theme.palette.custom.diamondBlack.main,
-  },
-}));
-
 export default function Hero() {
-  const classes = useStyles();
-  return (
-    <Container maxWidth="sm" component="main" className={classes.heroContent}>
-      <Typography
-        variant="h5"
-        align="center"
-        gutterBottom
-        className={classes.heroTitle}
-      >
-        {"Hatsmith"}<VersionBadge />
-      </Typography>
-      
-      <Typography
-        variant="subtitle1"
-        align="center"
-        component="p"
-        className={classes.heroSubTitle}
-      >
-        {t('sub_title')}
-        <br />
-      </Typography>
-    </Container>
-  );
+  return <Container maxWidth="sm" sx={{ pt: { xs: 3, sm: 6 }, pb: { xs: 3, sm: 4 } }}>
+    <Typography component="h1" variant="h1" sx={{ fontSize: { xs: 28, sm: 36 } }}>{t("hero_title")}</Typography>
+    <Typography color="text.secondary" sx={{ mt: 1.5 }}>{t("hero_description")}</Typography>
+    <Box sx={{ mt: 2, display: "flex", alignItems: "center", gap: 1 }}>
+      <Box aria-hidden="true" sx={{ width: 7, height: 7, borderRadius: "50%", bgcolor: "primary.main", flexShrink: 0 }} />
+      <Typography variant="body2" color="text.secondary">{t("offline_note")}</Typography>
+    </Box>
+  </Container>;
 }

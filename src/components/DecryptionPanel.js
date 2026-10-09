@@ -1,200 +1,10 @@
-/* eslint-disable @next/next/no-img-element */
 import { useState, useEffect } from "react";
 import { useRouter } from "next/router";
 import { useDropzone } from "react-dropzone";
-import { formatBytes } from "../helpers/formatBytes";
-import { formatName } from "../helpers/formatName";
-import {
-  crypto_secretstream_xchacha20poly1305_ABYTES,
-  CHUNK_SIZE,
-} from "../config/Constants";
-import { Alert, AlertTitle } from "@mui/material";
-import { makeStyles } from "@mui/styles";
-import Grid from "@mui/material/Grid";
-import Stepper from "@mui/material/Stepper";
-import Step from "@mui/material/Step";
-import StepLabel from "@mui/material/StepLabel";
-import StepContent from "@mui/material/StepContent";
-import Button from "@mui/material/Button";
-import Paper from "@mui/material/Paper";
-import Typography from "@mui/material/Typography";
-import CircularProgress from "@mui/material/CircularProgress";
-import TextField from "@mui/material/TextField";
-import IconButton from "@mui/material/IconButton";
-import Tooltip from "@mui/material/Tooltip";
-import Backdrop from "@mui/material/Backdrop";
-import Collapse from "@mui/material/Collapse";
-import LockOpenIcon from "@mui/icons-material/LockOpen";
-import RefreshIcon from "@mui/icons-material/Refresh";
-import DescriptionIcon from "@mui/icons-material/Description";
-import GetAppIcon from "@mui/icons-material/GetApp";
-import Visibility from "@mui/icons-material/Visibility";
-import VisibilityOff from "@mui/icons-material/VisibilityOff";
-import AttachFileIcon from "@mui/icons-material/AttachFile";
-import CloseIcon from "@mui/icons-material/Close";
-import AddIcon from "@mui/icons-material/Add";
-import RotateLeftIcon from "@mui/icons-material/RotateLeft";
+import FileWorkflow from "./FileWorkflow";
 import { getTranslations as t } from "../../locales";
-import {
-  List,
-  ListItem,
-  ListItemSecondaryAction,
-  ListItemText,
-} from "@mui/material";
-import DeleteIcon from "@mui/icons-material/Delete";
-import InfoIcon from "@mui/icons-material/Info";
-import FileInfoDialog from "./FileInfoDialog";
-
-
-const useStyles = makeStyles((theme) => ({
-  root: {
-    width: "100%",
-  },
-  offline: {
-    fontSize: 12,
-    float: "right",
-    color: theme.palette.custom.diamondBlack.main,
-  },
-  stepper: {
-    backgroundColor: "transparent",
-  },
-
-  stepIcon: {
-    "&$activeStepIcon": {
-      color: theme.palette.custom.emperor.main,
-    },
-    "&$completedStepIcon": {
-      color: theme.palette.custom.emperor.main,
-    },
-  },
-  activeStepIcon: {},
-  completedStepIcon: {},
-
-  button: {
-    marginTop: theme.spacing(1),
-    marginRight: theme.spacing(1),
-    borderRadius: "8px",
-    border: "none",
-    color: theme.palette.custom.mineShaft.main,
-    backgroundColor: theme.palette.custom.mercury.light,
-    "&:hover": {
-      backgroundColor: theme.palette.custom.mercury.main,
-    },
-    transition: "background-color 0.2s ease-out",
-  },
-
-  browseButton: {
-    padding: 8,
-    paddingLeft: 15,
-    paddingRight: 15,
-    textTransform: "none",
-    borderRadius: "8px",
-    border: "none",
-    color: theme.palette.custom.mineShaft.main,
-    backgroundColor: theme.palette.custom.alto.light,
-    "&:hover": {
-      backgroundColor: theme.palette.custom.alto.main,
-    },
-    transition: "background-color 0.2s ease-out",
-    transition: "color .01s",
-  },
-
-  resetButton: {
-    marginLeft: 8,
-    padding: 8,
-    paddingLeft: 15,
-    paddingRight: 15,
-    textTransform: "none",
-    borderRadius: "8px",
-    border: "none",
-    color: theme.palette.custom.flower.text,
-    backgroundColor: theme.palette.custom.flower.main,
-    "&:hover": {
-      backgroundColor: theme.palette.custom.flower.light,
-    },
-    transition: "background-color 0.2s ease-out",
-    transition: "color .01s",
-  },
-
-  backButton: {
-    marginTop: theme.spacing(1),
-    marginRight: theme.spacing(1),
-    borderRadius: "8px",
-    backgroundColor: theme.palette.custom.mercury.main,
-  },
-  nextButton: {
-    marginTop: theme.spacing(1),
-    marginRight: theme.spacing(1),
-    borderRadius: "8px",
-    backgroundColor: theme.palette.primary.main,
-    color: theme.palette.custom.white.main,
-    "&:hover": {
-      backgroundColor: theme.palette.custom.mineShaft.main,
-    },
-    transition: "color .01s",
-  },
-
-  actionsContainer: {
-    marginBottom: theme.spacing(2),
-  },
-  resetContainer: {
-    padding: theme.spacing(3),
-    boxShadow: "rgba(149, 157, 165, 0.4) 0px 8px 24px",
-    borderRadius: "8px",
-  },
-
-  input: {
-    display: "none",
-  },
-
-  fileArea: {
-    padding: "20px",
-    border: "5px dashed",
-    borderColor: theme.palette.custom.gallery.main,
-    borderRadius: "14px",
-    alignItems: "center",
-    justifyContent: "center",
-    flexDirection: "column",
-    marginBottom: "10px",
-  },
-
-  filesInfo: {
-    float: "right",
-    marginTop: 15,
-    textTransform: "none",
-    color: theme.palette.custom.cottonBoll.text,
-    transition: "background-color 0.2s ease-out",
-    transition: "color .01s",
-  },
-
-  filesPaper: {
-    marginBottom: 15,
-    overflow: "auto",
-    maxHeight: "280px",
-    backgroundColor: "transparent",
-  },
-
-  filesList: {
-    display: "flex",
-    flex: "1",
-    flexWrap: "wrap",
-    alignContent: "center",
-    justifyContent: "center",
-  },
-
-  filesListItem: {
-    backgroundColor: "#f3f3f3",
-    borderRadius: "8px",
-    padding: 15,
-  },
-
-  filesListItemText: {
-    width: "100px",
-    maxWidth: "150px",
-    minHeight: "50px",
-    maxHeight: "50px",
-  },
-}));
+import { formatName } from "../helpers/formatName";
+import { CHUNK_SIZE, crypto_secretstream_xchacha20poly1305_ABYTES } from "../config/Constants";
 
 let file,
   index,
@@ -207,10 +17,11 @@ let file,
   privateKey,
   publicKey;
 
-let operationId, downloadUrl, nextFileTimer;
+let operationId, downloadUrl, nextFileTimer, pendingRequestId;
 const postToWorker = (worker, data, transfer = []) =>
   worker.postMessage({ ...data, operationId }, transfer);
 const cancelOperation = () => {
+  pendingRequestId = null;
   clearTimeout(nextFileTimer);
   if (operationId && navigator.serviceWorker.controller) {
     postToWorker(navigator.serviceWorker.controller, { cmd: "cancelOperation" });
@@ -219,19 +30,20 @@ const cancelOperation = () => {
   downloadUrl = null;
 };
 
-export default function DecryptionPanel() {
-  const classes = useStyles();
+export default function DecryptionPanel({ active = true }) {
 
   const [operationError, setOperationError] = useState(false);
+  const [errorFile, setErrorFile] = useState(null);
   const handleOperationError = () => {
+    setErrorFile(files[currFile]?.name);
     cancelOperation();
     setOperationError(true);
+    resetCurrFile();
     setIsDownloading(false);
     setIsTestingPassword(false);
     setIsTestingKeys(false);
     setIsCheckingFile(false);
   };
-
 
   const router = useRouter();
 
@@ -250,8 +62,6 @@ export default function DecryptionPanel() {
   const [PublicKey, setPublicKey] = useState();
 
   const [PrivateKey, setPrivateKey] = useState();
-
-  const [showPrivateKey, setShowPrivateKey] = useState(false);
 
   const [wrongPublicKey, setWrongPublicKey] = useState(false);
 
@@ -275,19 +85,17 @@ export default function DecryptionPanel() {
 
   const [isTestingKeys, setIsTestingKeys] = useState(false);
 
-  const [showPassword, setShowPassword] = useState(false);
-
   const [isDownloading, setIsDownloading] = useState(false);
 
   const [pkAlert, setPkAlert] = useState(false);
 
-  const { getRootProps, getInputProps, isDragActive } = useDropzone({
+  const { getRootProps, isDragActive } = useDropzone({
     onDrop: (acceptedFiles) => {
       handleFilesInput(acceptedFiles);
     },
     noClick: true,
     noKeyboard: true,
-    disabled: activeStep !== 0,
+    disabled: activeStep !== 0 || isCheckingFile || isTestingKeys || isTestingPassword || isDownloading,
   });
 
   const handleNext = () => {
@@ -305,8 +113,13 @@ export default function DecryptionPanel() {
   };
 
   const handleReset = () => {
+    setErrorFile(null);
     cancelOperation();
     setOperationError(false);
+    setIsDownloading(false);
+    setIsTestingPassword(false);
+    setIsTestingKeys(false);
+    setIsCheckingFile(false);
     password = null;
     setActiveStep(0);
     setFiles([]);
@@ -371,12 +184,6 @@ export default function DecryptionPanel() {
     resetFileErrors();
   };
 
-  const resetFilesInput = () => {
-    files = [];
-    setFiles(files);
-    resetFileErrors();
-  };
-
   const handlePasswordInput = (selectedPassword) => {
     setPassword(selectedPassword);
     password = selectedPassword;
@@ -404,6 +211,7 @@ export default function DecryptionPanel() {
   };
 
   const checkFiles = () => {
+    setOperationError(false);
     numberOfFiles = files.length;
     if (currFile <= numberOfFiles - 1) {
       checkFile(files[currFile]);
@@ -445,6 +253,8 @@ export default function DecryptionPanel() {
   };
 
   const testFilesDecryption = () => {
+    setErrorFile(null);
+    setOperationError(false);
     numberOfFiles = files.length;
     if (currFile <= numberOfFiles - 1) {
       testDecryption(files[currFile]);
@@ -519,51 +329,28 @@ export default function DecryptionPanel() {
     setWrongPublicKey(false);
   };
 
-  const loadPublicKey = (file) => {
-    if (file) {
-      // files must be of text and size below 1 mb
-      if (file.size <= 1000000) {
-        const reader = new FileReader();
-        reader.readAsText(file);
-        reader.onload = () => {
-          setPublicKey(reader.result);
-          publicKey = reader.result;
-        };
-      }
-    }
-  };
-
   const handlePrivateKeyInput = (selectedKey) => {
     setPrivateKey(selectedKey);
     privateKey = selectedKey;
     setWrongPrivateKey(false);
   };
 
-  const loadPrivateKey = (file) => {
-    if (file) {
-      // files must be of text and size below 1 mb
-      if (file.size <= 1000000) {
-        const reader = new FileReader();
-        reader.readAsText(file);
-        reader.onload = () => {
-          setPrivateKey(reader.result);
-          privateKey = reader.result;
-        };
-      }
-    }
-  };
-
   const handleEncryptedFilesDownload = async (e) => {
+    setIsDownloading(true);
+    resetCurrFile();
     numberOfFiles = Files.length;
     prepareFile();
   };
 
   const prepareFile = () => {
+    const requestId = crypto.randomUUID();
+    pendingRequestId = requestId;
     setOperationError(false);
     // send file name to sw
     let fileName = formatName(files[currFile].name);
     navigator.serviceWorker.ready.then((reg) => {
-      postToWorker(reg.active, { cmd: "prepareFileNameDec", fileName });
+      if (pendingRequestId !== requestId) return;
+      postToWorker(reg.active, { cmd: "prepareFileNameDec", fileName, requestId });
     }).catch(handleOperationError);
   };
 
@@ -705,6 +492,7 @@ export default function DecryptionPanel() {
           handleOperationError();
           break;
         case "badFile":
+          setErrorFile(files[currFile]?.name);
           if (numberOfFiles > 1) {
             setbadFile(files[currFile].name);
             setIsCheckingFile(false);
@@ -715,6 +503,7 @@ export default function DecryptionPanel() {
           break;
 
         case "oldVersion":
+          setErrorFile(files[currFile]?.name);
           if (numberOfFiles > 1) {
             setOldVersion(files[currFile].name);
             setIsCheckingFile(false);
@@ -769,39 +558,56 @@ export default function DecryptionPanel() {
           break;
 
         case "wrongDecPrivateKey":
+          setErrorFile(files[currFile]?.name);
+          resetCurrFile();
           setWrongPrivateKey(true);
           setIsTestingKeys(false);
           break;
 
         case "wrongDecPublicKey":
+          setErrorFile(files[currFile]?.name);
+          resetCurrFile();
           setWrongPublicKey(true);
           setIsTestingKeys(false);
           break;
 
         case "wrongDecKeys":
+          setErrorFile(files[currFile]?.name);
+          resetCurrFile();
           setWrongPublicKey(true);
           setWrongPrivateKey(true);
           setIsTestingKeys(false);
           break;
 
         case "wrongDecKeyPair":
+          setErrorFile(files[currFile]?.name);
+          resetCurrFile();
           setKeysError(true);
           setKeysErrorMessage(t("invalid_key_pair"));
           setIsTestingKeys(false);
           break;
 
         case "wrongDecKeyInput":
+          setErrorFile(files[currFile]?.name);
+          resetCurrFile();
           setKeysError(true);
           setKeysErrorMessage(t("invalid_keys_input"));
           setIsTestingKeys(false);
           break;
 
         case "wrongPassword":
+          setErrorFile(files[currFile]?.name);
+          resetCurrFile();
           setWrongPassword(true);
           setIsTestingPassword(false);
           break;
 
         case "filePreparedDec":
+          if (!pendingRequestId || (e.data.requestId && e.data.requestId !== pendingRequestId)) {
+            e.source.postMessage({ cmd: "cancelOperation", operationId: e.data.operationId });
+            break;
+          }
+          pendingRequestId = null;
           operationId = e.data.operationId;
           downloadUrl = e.data.downloadUrl;
           kickOffDecryption();
@@ -854,559 +660,22 @@ export default function DecryptionPanel() {
     return () => {
       navigator.serviceWorker.removeEventListener("message", onMessage);
       cancelOperation();
+      file = null; files = []; password = null; privateKey = null; publicKey = null;
+      currFile = 0; index = null;
+      decryptionMethodState = null; decFileBuff = null;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
-  const [selectedFile, setSelectedFile] = useState(null);
-    const [showInfo, setShowInfo] = useState(false);
-
-    const handleOpenInfo = (file) => {
-      setSelectedFile(file);
-      setShowInfo(true);
-    };
-
-    const handleCloseInfo = () => {
-      setShowInfo(false);
-      setSelectedFile(null);
-    };
-
-  return (
-    <div className={classes.root} {...getRootProps()}>
-      {operationError && <Alert severity="error">{t("file_processing_error")}</Alert>}
-      <Backdrop open={isDragActive} style={{ zIndex: 10 }}>
-        <Typography
-          variant="h2"
-          gutterBottom
-          style={{ color: "#fff", textAlign: "center" }}
-        >
-          <img
-            src="/assets/images/logo_new.png"
-            width="100"
-            height="100"
-            alt="hat.sh logo"
-          />
-          <br />
-          {t("drop_file_dec")}
-        </Typography>
-      </Backdrop>
-
-      <Collapse in={pkAlert} style={{ marginTop: 5 }}>
-        <Alert
-          severity="success"
-          action={
-            <IconButton
-              aria-label="close"
-              color="inherit"
-              size="small"
-              onClick={() => {
-                setPkAlert(false);
-              }}
-            >
-              <CloseIcon fontSize="inherit" />
-            </IconButton>
-          }
-        >
-          {t("sender_key_loaded")}
-        </Alert>
-      </Collapse>
-
-      <Stepper
-        activeStep={activeStep}
-        orientation="vertical"
-        className={classes.stepper}
-      >
-        <Step key={1}>
-          <StepLabel
-            StepIconProps={{
-              classes: {
-                root: classes.stepIcon,
-                active: classes.activeStepIcon,
-                completed: classes.completedStepIcon,
-              },
-            }}
-          >
-            {t("choose_files_dec")}
-          </StepLabel>
-          <StepContent>
-            <div className="wrapper p-3" id="decFileWrapper">
-              <div
-                className={classes.fileArea}
-                id="decFileArea"
-                style={{ display: Files.length > 0 ? "" : "flex" }}
-              >
-                <Paper elevation={0} className={classes.filesPaper}>
-                  <List dense={true} className={classes.filesList}>
-                    {Files.length > 0
-                      ? Files.map((file, index) => (
-                          <ListItem
-                            key={index}
-                            className={classes.filesListItem}
-                          >
-                            <ListItemText
-                              className={classes.filesListItemText}
-                              primary={file.name}
-                              secondary={formatBytes(file.size)}
-                            />
-                            <ListItemSecondaryAction>
-                              <IconButton
-                                style={{ marginTop: 40 }}
-                                onClick={() => handleOpenInfo(file)}
-                                edge="end"
-                                aria-label="info"
-                              >
-                                <InfoIcon />
-                              </IconButton>
-                              <IconButton
-                                style={{ marginTop: 40 }}
-                                onClick={() => updateFilesInput(index)}
-                                edge="end"
-                                aria-label="delete"
-                              >
-                                <DeleteIcon />
-                              </IconButton>
-                            </ListItemSecondaryAction>
-                          </ListItem>
-                        ))
-                      : t("drag_drop_files")}
-                  </List>
-                </Paper>
-
-                <input
-                  {...getInputProps()}
-                  className={classes.input}
-                  id="dec-file"
-                  type="file"
-                  onChange={(e) => handleFilesInput(e.target.files)}
-                  multiple
-                />
-                <label htmlFor="dec-file">
-                  <Button
-                    className={classes.browseButton}
-                    component="span"
-                    startIcon={
-                      Files.length > 0 ? <AddIcon /> : <DescriptionIcon />
-                    }
-                  >
-                    {Files.length > 0 ? t("add_files") : t("browse_files")}
-                  </Button>
-                </label>
-
-                {Files.length > 0 && (
-                  <>
-                    <Button
-                      onClick={() => resetFilesInput()}
-                      className={classes.resetButton}
-                      component="span"
-                      startIcon={<RotateLeftIcon />}
-                    >
-                      {t("reset")}
-                    </Button>
-
-                    <small className={classes.filesInfo}>
-                      {Files.length} {Files.length > 1 ? t("files") : t("file")}
-                    </small>
-                  </>
-                )}
-              </div>
-            </div>
-
-            <div className={classes.actionsContainer}>
-              <div>
-                <Button
-                  disabled={isCheckingFile || Files.length === 0}
-                  variant="contained"
-                  onClick={checkFiles}
-                  className={`${classes.nextButton} nextBtnHs submitFileDec`}
-                  startIcon={
-                    isCheckingFile && (
-                      <CircularProgress
-                        size={24}
-                        className={classes.buttonProgress}
-                      />
-                    )
-                  }
-                  fullWidth
-                >
-                  {isCheckingFile ? t("checking_file") : t("next")}
-                </Button>
-              </div>
-
-              {badFile && (
-                <Alert severity="error" style={{ marginTop: 15 }}>
-                  {t("file_not_encrypted_corrupted")}
-                  <br />
-                  {Files.length > 1 ? <strong>{badFile}</strong> : ""}
-                </Alert>
-              )}
-
-              {oldVersion && (
-                <Alert severity="error" style={{ marginTop: 15 }}>
-                  {t("old_version")}{" "}
-                  <a href="https://web.archive.org/web/20211028050731/https://v1.hat.sh/" target="_blank" rel="noreferrer">
-                    {"https://v1.hat.sh (Archived)"}
-                  </a>
-                  <br />
-                  {Files.length > 1 ? <strong>{oldVersion}</strong> : ""}
-                </Alert>
-              )}
-
-              {fileMixUp && (
-                <Alert severity="error" style={{ marginTop: 15 }}>
-                  {t("file_mixup")}
-                </Alert>
-              )}
-            </div>
-
-            {!badFile && !oldVersion && !fileMixUp && (
-              <Typography className={classes.offline}>
-                {t("offline_note")}
-              </Typography>
-            )}
-            <FileInfoDialog file={selectedFile} display={showInfo} onClose={handleCloseInfo} />
-          </StepContent>
-        </Step>
-
-        <Step key={2}>
-          <StepLabel
-            StepIconProps={{
-              classes: {
-                root: classes.stepIcon,
-                active: classes.activeStepIcon,
-                completed: classes.completedStepIcon,
-              },
-            }}
-          >
-            {decryptionMethod === "secretKey"
-              ? t("enter_password_dec")
-              : t("enter_keys_dec")}
-          </StepLabel>
-          <StepContent>
-            {decryptionMethod === "secretKey" && (
-              <TextField
-                required
-                type={showPassword ? "text" : "password"}
-                error={wrongPassword ? true : false}
-                id={
-                  wrongPassword
-                    ? "outlined-error-helper-text"
-                    : "outlined-required"
-                }
-                className="decPasswordInput"
-                label={wrongPassword ? t("error") : t("required")}
-                helperText={wrongPassword ? t("wrong_password") : ""}
-                placeholder={t("password")}
-                variant="outlined"
-                value={Password ? Password : ""}
-                onChange={(e) => handlePasswordInput(e.target.value)}
-                fullWidth
-                InputProps={{
-                  endAdornment: (
-                    <Tooltip title={t("show_password")} placement="left">
-                      <IconButton
-                        onClick={() => setShowPassword(!showPassword)}
-                      >
-                        {showPassword ? <Visibility /> : <VisibilityOff />}
-                      </IconButton>
-                    </Tooltip>
-                  ),
-                }}
-              />
-            )}
-
-            {decryptionMethod === "publicKey" && (
-              <>
-                <TextField
-                  id="public-key-input-dec"
-                  required
-                  error={wrongPublicKey || keysError ? true : false}
-                  helperText={wrongPublicKey ? t("wrong_public_key") : ""}
-                  label={t("sender_public_key")}
-                  placeholder={t("enter_sender_public_key")}
-                  variant="outlined"
-                  value={PublicKey ? PublicKey : ""}
-                  onChange={(e) => handlePublicKeyInput(e.target.value)}
-                  fullWidth
-                  style={{ marginBottom: "15px" }}
-                  InputProps={{
-                    endAdornment: (
-                      <>
-                        <input
-                          accept=".public"
-                          className={classes.input}
-                          id="dec-public-key-file"
-                          type="file"
-                          onChange={(e) => loadPublicKey(e.target.files[0])}
-                        />
-                        <label htmlFor="dec-public-key-file">
-                          <Tooltip
-                            title={t("load_public_key")}
-                            placement="left"
-                          >
-                            <IconButton
-                              aria-label={t("load_public_key")}
-                              component="span"
-                            >
-                              <AttachFileIcon />
-                            </IconButton>
-                          </Tooltip>
-                        </label>
-                      </>
-                    ),
-                  }}
-                />
-
-                <TextField
-                  id="private-key-input-dec"
-                  type={showPrivateKey ? "text" : "password"}
-                  required
-                  error={wrongPrivateKey || keysError ? true : false}
-                  helperText={wrongPrivateKey ? t("wrong_private_key") : ""}
-                  label={t("your_private_key_dec")}
-                  placeholder={t("enter_private_key_dec")}
-                  variant="outlined"
-                  value={PrivateKey ? PrivateKey : ""}
-                  onChange={(e) => handlePrivateKeyInput(e.target.value)}
-                  fullWidth
-                  style={{ marginBottom: "15px" }}
-                  InputProps={{
-                    endAdornment: (
-                      <>
-                        {PrivateKey && (
-                          <Tooltip
-                            title={t("show_private_key")}
-                            placement="left"
-                          >
-                            <IconButton
-                              onClick={() => setShowPrivateKey(!showPrivateKey)}
-                            >
-                              {showPrivateKey ? (
-                                <Visibility />
-                              ) : (
-                                <VisibilityOff />
-                              )}
-                            </IconButton>
-                          </Tooltip>
-                        )}
-
-                        <input
-                          accept=".private"
-                          className={classes.input}
-                          id="dec-private-key-file"
-                          type="file"
-                          onChange={(e) => loadPrivateKey(e.target.files[0])}
-                        />
-                        <label htmlFor="dec-private-key-file">
-                          <Tooltip
-                            title={t("load_private_key")}
-                            placement="left"
-                          >
-                            <IconButton
-                              aria-label={t("load_private_key")}
-                              component="span"
-                            >
-                              <AttachFileIcon />
-                            </IconButton>
-                          </Tooltip>
-                        </label>
-                      </>
-                    ),
-                  }}
-                />
-              </>
-            )}
-
-            <div className={classes.actionsContainer}>
-              <div>
-                <Grid container spacing={1}>
-                  <Grid item>
-                    <Button
-                      disabled={
-                        activeStep === 0 || isTestingPassword || isTestingKeys
-                      }
-                      onClick={handleBack}
-                      className={classes.backButton}
-                      fullWidth
-                    >
-                      {t("back")}
-                    </Button>
-                  </Grid>
-                  <Grid item xs>
-                    <Button
-                      disabled={
-                        (decryptionMethod === "secretKey" && !Password) ||
-                        (decryptionMethod === "publicKey" &&
-                          (!PublicKey || !PrivateKey)) ||
-                        isTestingPassword ||
-                        isTestingKeys
-                      }
-                      variant="contained"
-                      onClick={testFilesDecryption}
-                      className={`${classes.nextButton} nextBtnHs submitKeysDec`}
-                      startIcon={
-                        (isTestingPassword || isTestingKeys) && (
-                          <CircularProgress
-                            size={24}
-                            className={classes.buttonProgress}
-                          />
-                        )
-                      }
-                      fullWidth
-                    >
-                      {isTestingPassword
-                        ? `${currFileState + 1}/${numberOfFiles} ${t(
-                            "testing_password"
-                          )}`
-                        : isTestingKeys
-                        ? `${currFileState + 1}/${numberOfFiles} ${t(
-                            "testing_keys"
-                          )}`
-                        : t("next")}
-                    </Button>
-                  </Grid>
-                </Grid>
-                <br />
-
-                {decryptionMethod === "secretKey" &&
-                  Files.length > 1 &&
-                  wrongPassword &&
-                  !isTestingPassword && (
-                    <Alert severity="error">
-                      <strong>{Files[currFile].name}</strong>{" "}
-                      {t("file_has_wrong_password")}
-                    </Alert>
-                  )}
-
-                {decryptionMethod === "publicKey" && keysError && (
-                  <Alert severity="error">{keysErrorMessage}</Alert>
-                )}
-
-                {decryptionMethod === "publicKey" &&
-                  (wrongPrivateKey || wrongPublicKey) &&
-                  !isTestingKeys &&
-                  !keysError && (
-                    <>
-                      {Files.length > 1 && (
-                        <Alert severity="error">
-                          <strong>{Files[currFile].name}</strong>{" "}
-                          {t("file_has_wrong_keys")}
-                        </Alert>
-                      )}
-                    </>
-                  )}
-              </div>
-            </div>
-          </StepContent>
-        </Step>
-
-        <Step key={3}>
-          <StepLabel
-            StepIconProps={{
-              classes: {
-                root: classes.stepIcon,
-                active: classes.activeStepIcon,
-                completed: classes.completedStepIcon,
-              },
-            }}
-          >
-            {t("download_decrypted_files")}
-          </StepLabel>
-
-          <StepContent>
-            {Files.length > 0 && (
-              <Alert severity="success" icon={<LockOpenIcon />}>
-                <strong>
-                  {Files.length > 1 ? Files.length : Files[0].name}
-                </strong>{" "}
-                {Files.length > 1
-                  ? t("files_ready_to_download")
-                  : t("ready_to_download")}
-              </Alert>
-            )}
-
-            <div className={classes.actionsContainer}>
-              <Grid container spacing={1}>
-                <Grid item>
-                  <Button
-                    disabled={activeStep === 0 || isDownloading}
-                    onClick={handleBack}
-                    className={classes.backButton}
-                  >
-                    {t("back")}
-                  </Button>
-                </Grid>
-                <Grid item xs>
-                  <Button
-                    disabled={
-                      isDownloading ||
-                      (!Password && !PublicKey && !PrivateKey) ||
-                      Files.length === 0
-                    }
-                    variant="contained"
-                    color="primary"
-                    className={`${classes.nextButton} nextBtnHs`}
-                    startIcon={
-                      isDownloading ? (
-                        <CircularProgress
-                          size={24}
-                          className={classes.buttonProgress}
-                        />
-                      ) : (
-                        <GetAppIcon />
-                      )
-                    }
-                    fullWidth
-                  >
-                    <a
-                      onClick={(e) => handleEncryptedFilesDownload(e)}
-                      className="downloadFileDec"
-                      style={{
-                        width: "100%",
-                        textDecoration: "none",
-                      }}
-                    >
-                      {isDownloading
-                        ? `${currFileState + 1}/${numberOfFiles} ${t(
-                            "downloading_file"
-                          )}`
-                        : t("decrypted_files")}
-                    </a>
-                  </Button>
-                </Grid>
-              </Grid>
-              <br />
-
-              {isDownloading && (
-                <Alert variant="outlined" severity="info">
-                  {t("page_close_alert")}
-                </Alert>
-              )}
-            </div>
-          </StepContent>
-        </Step>
-      </Stepper>
-      {activeStep === 3 && (
-        <Paper elevation={1} className={classes.resetContainer}>
-          <Alert
-            variant="outlined"
-            severity="success"
-            style={{ border: "none" }}
-          >
-            <AlertTitle>{t("success")}</AlertTitle>
-            {t("success_downloaded_files_dec")}
-          </Alert>
-
-          <Button
-            onClick={handleReset}
-            className={classes.button}
-            variant="outlined"
-            startIcon={<RefreshIcon />}
-            fullWidth
-            style={{ textTransform: "none" }}
-          >
-            {t("decrypt_other_files")}
-          </Button>
-        </Paper>
-      )}
-    </div>
-  );
+  return <FileWorkflow
+    direction="decrypt" active={active} step={activeStep} done={activeStep === 3}
+    files={Files} onFiles={handleFilesInput} onRemove={updateFilesInput} onFileContinue={checkFiles}
+    method={decryptionMethod} password={Password} onPassword={handlePasswordInput}
+    publicKey={PublicKey} privateKey={PrivateKey} onPublicKey={handlePublicKeyInput} onPrivateKey={handlePrivateKeyInput}
+    publicKeyError={wrongPublicKey} privateKeyError={wrongPrivateKey} keysError={keysError ? keysErrorMessage : null}
+    passwordError={wrongPassword} fileError={badFile ? t("file_not_encrypted_corrupted") : oldVersion ? t("old_version") : fileMixUp ? t("file_mixup") : null} operationError={operationError} errorFile={errorFile}
+    checking={isCheckingFile} testing={isTestingPassword || isTestingKeys} processing={isDownloading} currentFile={currFileState}
+    onCredentialContinue={testFilesDecryption} onBack={handleBack} onReset={handleReset}
+    rootProps={getRootProps()} isDragActive={isDragActive} publicKeyNotice={pkAlert}
+    onExecute={handleEncryptedFilesDownload} onCancel={handleReset}
+  />;
 }

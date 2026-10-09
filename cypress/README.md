@@ -1,25 +1,17 @@
-### Testing with cypress
+# Cypress fixtures
 
-- cypress and it's dependencies have to be installed
-- The app has to be running in dev mode
-- Tests are done on chrome
-- Avoid running all test files at the same time
+Run commands from the Veli repository root:
 
-<br>
+```sh
+cd Veli
+npm ci
+npm run dev
+```
 
-move to the hat.sh app root directory
+In a second terminal, open Cypress with `npm run test`. The app must be running
+in development mode, and these fixtures were written for Chrome. Run individual
+specs rather than all specs at once.
 
-`cd hat.sh`
-
-install cypress/dependencies:
-
-`npm install cypress@8.7.0 cypress-file-upload@5.0.8 cypress-real-events@1.5.1 --save-dev`
-
-run the app in dev enviroment: 
-
-`npm run dev`
-
-start cypress testing :
-
-`npm run test`
-
+These inherited fixtures include selectors from the earlier interface. The
+maintained regression suite for the current UI is Playwright; see
+[Verification in the README](../README.md#verification).

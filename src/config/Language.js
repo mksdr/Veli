@@ -1,58 +1,30 @@
-import { useState } from "react";
-import { makeStyles } from "@mui/styles";
-import InputLabel from "@mui/material/InputLabel";
-import MenuItem from "@mui/material/MenuItem";
-import FormControl from "@mui/material/FormControl";
-import Select from "@mui/material/Select";
-import { Button, Hidden } from "@mui/material";
-import { Alert } from "@mui/material";
-import { checkLocale } from "../../locales";
-import { getTranslations as t } from "../../locales";
+import { useId, useState } from "react";
+import { Button, Dialog, DialogActions, DialogContent, DialogContentText, DialogTitle, FormControl, InputLabel, MenuItem, Select } from "@mui/material";
+import { getTranslations as t, useLocale } from "../../locales";
 import locales from "../../locales/locales";
-import { setStoredValue } from "../utils/storage";
-
-const useStyles = makeStyles((theme) => ({
-  formControl: {
-    margin: theme.spacing(1),
-    minWidth: 120,
-    padding: 0,
-  },
-}));
-
-const Language = () => {
-  const classes = useStyles();
-
-  const [language, setLanguage] = useState(checkLocale());
-
-  const handleLanguageChange = (e) => {
-    setLanguage(e.target.value);
-    setStoredValue("language", e.target.value);
-    window.location.reload(true);
+import { useWorkflow } from "../components/WorkflowContext";
+export default function Language() {
+  const { locale, changeLocale } = useLocale();
+  const { busy, dirty } = useWorkflow();
+  const [pending, setPending] = useState(null);
+  const id = useId();
+  const choose = event => {
+    if (dirty) setPending(event.target.value);
+    else changeLocale(event.target.value);
   };
-
-  return (
-    <>
-      <FormControl varient="outlined" className={classes.formControl} sx={{
-          '& .MuiOutlinedInput-root': {
-            height: '40px', // Adjust this to your desired height
-            padding: '5px'
-          }
-          }}>
-        <InputLabel>{t("language")}</InputLabel>
-        <Select
-          value={language}
-          onChange={handleLanguageChange}
-          label={t("language")}
-        >
-          {Object.entries(locales).map(([code, name]) => (
-            <MenuItem key={code} value={code}>
-              {name.language_name}
-            </MenuItem>
-          ))}
-        </Select>
-      </FormControl>
-    </>
-  );
-};
-
-export default Language;
+  return <>
+    <FormControl size="small" sx={{ minWidth: 130, my: 1 }} disabled={busy}>
+      <InputLabel id={id}>{t("language")}</InputLabel>
+      <Select labelId={id} value={locale} onChange={choose} label={t("language")}>
+        {Object.entries(locales).map(([code, copy]) => <MenuItem key={code} value={code}>{copy.language_name}</MenuItem>)}
+      </Select>
+    </FormControl>
+    <Dialog open={!!pending} onClose={() => setPending(null)} aria-labelledby={`${id}-title`}>
+      <DialogTitle id={`${id}-title`}>{t("language_restart_title")}</DialogTitle>
+      <DialogContent><DialogContentText>{t("language_restart_description")}</DialogContentText></DialogContent>
+      <DialogActions><Button onClick={() => setPending(null)}>{t("cancel")}</Button>
+        <Button variant="contained" disabled={busy} onClick={() => changeLocale(pending)}>{t("language_restart")}</Button>
+      </DialogActions>
+    </Dialog>
+  </>;
+}

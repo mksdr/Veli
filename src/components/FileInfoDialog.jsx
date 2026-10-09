@@ -6,7 +6,9 @@ import {
   DialogTitle,
   DialogContent,
   Typography,
-  CircularProgress
+  CircularProgress,
+  Button,
+  DialogActions
 } from '@mui/material';
 import { FileUtils } from '../utils/fileUtils';
 import { getTranslations as t } from '../../locales';
@@ -38,28 +40,29 @@ const FileInfoDialog = ({ file, display, onClose }) => {
   }, [file, display]);
 
   return (
-    <Dialog open={display} onClose={onClose} maxWidth="sm" fullWidth>
-      <DialogTitle>{t('fi_file_info')}</DialogTitle>
-      <DialogContent>
+    <Dialog aria-labelledby="file-info-title" open={display} onClose={onClose} maxWidth="sm" fullWidth>
+      <DialogTitle id="file-info-title">{t('fi_file_info')}</DialogTitle>
+      <DialogContent sx={{ overflowWrap: "anywhere" }}>
         {loading ? (
           <CircularProgress />
         ) : fileInfo ? (
           <>
             <Typography><strong>{t('fi_name')}:</strong> {fileInfo.name}</Typography>
-            <Typography><strong>{t('fi_size')}:</strong> {fileInfo.size} bytes</Typography>
+            <Typography><strong>{t('fi_size')}:</strong> {fileInfo.size} B</Typography>
             <Typography><strong>{t('fi_type')}:</strong> {fileInfo.type}</Typography>
-            <Typography><strong>{t('fi_last_modified')}:</strong> {fileInfo.lastModified.toLocaleString()}</Typography>
+            <Typography><strong>{t('fi_last_modified')}:</strong> {fileInfo.lastModified.toLocaleString(document.documentElement.lang)}</Typography>
 
             <Typography variant="h6" sx={{ mt: 2 }}>{t('fi_hashes')}</Typography>
             {fileInfo.hashesUnavailable && <Typography>{t('file_hash_limit')}</Typography>}
-            <Typography><strong>SHA-256:</strong> {fileInfo.hashes.sha256}</Typography>
-            <Typography><strong>SHA-1:</strong> {fileInfo.hashes.sha1}</Typography>
-            <Typography><strong>MD5:</strong> {fileInfo.hashes.md5}</Typography>
+            <Typography><strong>SHA-256:</strong> {fileInfo.hashes.sha256 || t("hash_unavailable")}</Typography>
+            <Typography><strong>SHA-1:</strong> {fileInfo.hashes.sha1 || t("hash_unavailable")}</Typography>
+            <Typography><strong>MD5:</strong> {fileInfo.hashes.md5 || t("hash_unavailable")}</Typography>
           </>
         ) : (
-          <Typography>{error ? t('file_info_error') : "No file selected."}</Typography>
+          <Typography>{error ? t('file_info_error') : t("no_file")}</Typography>
         )}
       </DialogContent>
+      <DialogActions><Button onClick={onClose}>{t("close")}</Button></DialogActions>
     </Dialog>
   );
 };

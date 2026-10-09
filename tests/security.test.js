@@ -193,3 +193,13 @@ test("falls back from an older worker that does not implement the protocol", asy
     postMessage(data, ports) { ports[0].postMessage({ version: 1 }); },
   } } }, 100), true);
 });
+
+test("download setup echoes its request token and can be cancelled before fetching", async () => {
+  const h = harness(), client = h.client("setup-cancellation");
+  await h.send(client, { cmd: "prepareFileNameEnc", fileName: "sample.enc", requestId: "ui-request-123" });
+  const prepared = client.messages.at(-1);
+  assert.equal(prepared.requestId, "ui-request-123");
+  assert.equal(prepared.reply, "filePreparedEnc");
+  await h.send(client, { cmd: "cancelOperation", operationId: prepared.operationId });
+  assert.equal(h.fetch(prepared.downloadUrl).status, 404);
+});

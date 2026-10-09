@@ -52,7 +52,7 @@ must not treat a failed or partial download as a complete decrypted file.
   (7 high, 3 moderate, 4 low) in the legacy Cypress, ESLint glob, and Browserify
   crypto-polyfill chains. These need a separate toolchain migration and are
   not included in the zero production-dependency count. Browserify can bundle
-  crypto polyfills; Hatsmith's file encryption and key exchange use libsodium,
+  crypto polyfills; Veli's file encryption and key exchange use libsodium,
   not the affected elliptic operations. This distinction does not establish
   that the development toolchain is free of security risks.
 - Repository Markdown is rendered as HTML from build-time documentation;

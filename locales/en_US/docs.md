@@ -1,9 +1,11 @@
 # [Introduction](#introduction)
 
 ---
-[Hatsmith](https://hatsmith.vercel.app) is a web app that provides secure local file encryption in the browser. It's fast, secure, and uses modern cryptographic algorithms with chunked AEAD stream encryption/decryption.
+[Veli](https://github.com/mksdr/Veli) provides local file encryption and decryption in your browser, using chunked authenticated encryption.
 
-Hatsmith is a fork of [Hat.sh](https://github.com/sh-dv/hat.sh), created by sh-dv, and other contributors. Hatsmith will be a drop-in replacement for Hat.sh, with the same features and security guarantees, and will keep the same versioning scheme.
+## Project history
+
+Veli continues [Hatsmith](https://github.com/mrtechtroid/hatsmith), maintained by mrtechtroid. Hatsmith was forked from [hat.sh](https://github.com/sh-dv/hat.sh), created by sh-dv and contributors. Veli preserves their v2 file format and credits while improving the interface and validation.
 
 <br>
 
@@ -41,145 +43,55 @@ The libsodium library is used for all cryptographic algorithms. [Technical detai
 # [Installation](#installation)
 
 ---
-It's easy to self host and deploy hat.sh, you can do that either with npm or docker
 
-If you wish to self host the app please follow these instructions:
-
-<br>
-
-## With npm
-
-Before installation make sure you are running [nodejs](https://nodejs.org/en/) and have [npm](https://www.npmjs.com/) installed
-
-<br >
-
-1. clone the github repository
+Use Node.js 22 or newer. Clone the current Veli repository and install the locked dependencies:
 
 ```bash
-git clone https://github.com/mrtechtroid/hatsmith.git hatsmith
+git clone https://github.com/mksdr/Veli.git Veli
+cd Veli
+CYPRESS_INSTALL_BINARY=0 npm ci
 ```
 
-2. move to the folder
-
-```bash
-cd hatsmith
-```
-
-3. install dependencies
-
-```bash
-npm install
-```
-
-4. build app
-
-```bash
-npm run build
-```
-
-5. start hat.sh
-
-```bash
-npm run start
-```
-
-the app should be running on port 3391.
-<br>
-
-if you wish to run the app in development enviroment run :
-
-<br>
+## Development
 
 ```bash
 npm run dev
 ```
 
-<br>
+Open `http://localhost:3000`.
 
-## With docker
-
-You can install the app with docker in multiple ways. You are free to choose which method you like.
-
-<br>
-
-- #### install from GHCR
-
-1. pull image from GHCR
+## Static hosting
 
 ```bash
-docker pull ghcr.io/mrtechtroid/hatsmith:master
+npm run build
 ```
 
-2. run container
+Serve the generated `out/` directory with a static web server. To preview it locally with Python:
 
 ```bash
-docker run -d -p 3991:80 shdv/hat.sh
+python3 -m http.server 3991 --directory out
 ```
 
-<br> 
+Open `http://localhost:3991`. Remote hosting should use HTTPS for service workers and browser APIs.
 
-- #### Build an image from source
+## Docker
 
-1. clone the github repository
+Build and run the current source locally:
 
 ```bash
-git clone https://github.com/mrtechtroid/hatsmith.git hatsmith
+docker build -t veli:local .
+docker run --rm -p 3991:80 veli:local
 ```
 
-2. move to the folder
+Or use the repository's Compose configuration:
 
 ```bash
-cd hatsmith
+docker compose up --build
 ```
 
-3. build image using docker
-
-```bash
-docker build . -t mrtechtroid/hatsmith
-```
-
-4. run container
-
-```bash
-docker run -d -p 3991:80 mrtechtroid/hatsmith
-```
+These commands build Veli locally and do not require a published container image.
 
 <br>
-
-- #### Using docker compose
-
-1. clone the github repository
-
-```bash
-git clone https://github.com/mrtechtroid/hatsmith.git hatsmith
-```
-
-2. move to the folder
-
-```bash
-cd hatsmith
-```
-
-3. build image using docker compose
-
-```bash
-docker compose build
-```
-
-4. run container
-
-```bash
-docker compose up
-```
-
-<br>
-
-The app should be running on port 3991.
-
-<!-- hat.sh is also available as a Docker image. You can find it on [Docker Hub]. -->
-
-<br>
-
 
 # [Usage](#usage)
 
@@ -189,24 +101,21 @@ The app should be running on port 3991.
 
 - ### using a password
 
-1. Open Hatsmith.
-2. Navigate to the Encryption panel.
-3. Drag & Drop or Select the files that you wish to encrypt.
-4. Enter a password or generate one.
-5. Download the encrypted file.
+1. Choose **Encrypt files** and select the files to protect.
+2. Choose **Set a password**. Enter at least 12 characters, or choose a generation option and **Create a password**.
+3. Keep the password somewhere safe, then choose **Review encryption**. A lost password cannot be recovered.
+4. Check the selected files and protection method. Choose **Encrypt & download** in streaming mode, or **Encrypt file** followed by **Download encrypted file** in single-file mode.
+5. Confirm the saved file in your browser's download list. The original file is kept.
 
-> You should always use a strong password!
+If sharing the file, send the password through a separate channel. Veli does not send either for you.
 
 - ### using public and private keys
 
-1. Open Hatsmith.
-2. Navigate to the Encryption panel.
-3. Drag & Drop or Select the files that you wish to encrypt.
-4. Choose public key method.
-5. Enter or load recipient's public key and your private key.
-   if you don't have public and private keys you can generate a key pair.
-6. Download the encrypted file.
-7. Share your public key with the recipient so he will be able to decrypt the file.
+1. Choose **Encrypt files**, select files, then choose **Set a password**.
+2. Open **Use public keys · Advanced**.
+3. Enter or load the recipient's public key and your private key. If you need a key pair, use the key generator and safely back up the private key.
+4. Choose **Review encryption**, then encrypt and download as described above.
+5. Share your public key with the recipient so they can decrypt the file. The public-key link and QR code contain only the public key; send the encrypted file separately.
 
 > Never share your private key to anyone! Only public keys should be exchanged.
 
@@ -216,19 +125,21 @@ The app should be running on port 3991.
 
 - ### using a password
 
-1. Open Hatsmith.
-2. Navigate to the Decryption panel.
-3. Drag & Drop or Select the files that you wish to decrypt.
-4. Enter the encryption password.
-5. Download the decrypted file.
+1. Choose **Decrypt files**, select the encrypted files, and choose **Check file**.
+2. Enter the password used to encrypt the files.
+3. In streaming mode, choose **Check password**, then **Decrypt & download**. In single-file mode, choose **Decrypt file**, then **Download decrypted file** after verification finishes.
+4. Confirm the saved file in your browser's download list.
+
+The app reports success only after verifying the whole file. If streaming fails, delete any partial download and retry with the original encrypted file.
 
 - ### using public and private keys
 
-1. Open Hatsmith.
-2. Navigate to the Decryption panel.
-3. Drag & Drop or Select the files that you wish to decrypt.
-4. Enter or load sender's public key and your private key.
-5. Download the decrypted file.
+1. Choose **Decrypt files**, select the encrypted files, and choose **Check file**. The file determines which credentials are needed.
+2. Enter or load the sender's public key and your own private key.
+3. In streaming mode, choose **Check keys**, then **Decrypt & download**. In single-file mode, choose **Decrypt file**, then **Download decrypted file**.
+4. Confirm the saved file in your browser's download list.
+
+Settings offers English and Korean. Changing language clears current inputs and results after confirmation, so save any needed result first. If clipboard access is denied, the copy dialog lets you select and copy the text manually.
 
 <br>
 
@@ -238,11 +149,11 @@ The app should be running on port 3991.
 
 ### File Signature
 
-Files encrypted with Hatsmith are identifiable by looking at the file signature that is used by the app to verify the content of a file, Such signatures are also known as magic numbers or Magic Bytes. These Bytes are authenticated and cannot be changed.
+Files encrypted with Veli are identifiable by looking at the file signature that is used by the app to verify the content of a file, Such signatures are also known as magic numbers or Magic Bytes. These Bytes are authenticated and cannot be changed.
 
 ### Safari and Mobile Browsers
 
-Safari and Mobile browsers are limited to a single file with maximum size of 1GB due to some issues related to service-workers. In addition, this limitation also applies when the app fails to register the service-worker (e.g FireFox Private Browsing).
+Safari and mobile browsers use single-file mode, with an input limit of 1 GiB. Available device memory may require a smaller file. This mode also applies when service-worker streaming is unavailable, for example in Firefox Private Browsing. Keep the page open until processing finishes.
 
 <br>
 
@@ -303,22 +214,22 @@ Sharing decryption password can be done using a safe end-to-end encrypted messag
 
 ### Does the app log or store any of my data?
 
-No, Hatsmith never stores any of your data. It only runs locally in your browser.
+Veli processes files in your browser and does not upload file content, passwords, or private keys to a server. It stores language and appearance preferences locally.
 
 <hr style="height: 1px">
 
-### Is Hatsmith free?
+### Is Veli free?
 
-Yes, Hatsmith is free and always will be. 
+Yes, Veli is free and open source.
 <!-- However, please consider [donating](https://github.com/sh-dv/hat.sh#donations) to support the project. -->
 
 <hr style="height: 1px">
 
 ### Which file types are supported? Is there a file size limit?
 
-Hatsmith accepts all file types. There's no file size limit, meaning files of any size can be encrypted.
+Veli accepts all file types. There's no file size limit, meaning files of any size can be encrypted.
 
-Safari browser and mobile/smartphones browsers are limited to 1GB.
+Safari and mobile browsers use single-file mode with a 1 GiB input limit. Device memory may require smaller files.
 
 <hr style="height: 1px">
 
@@ -328,9 +239,9 @@ No, we don't know your password. Always make sure to store your passwords in a p
 
 <hr style="height: 1px">
 
-### Why am I seeing a notice that says "You have limited experience (single file, 1GB)"?
+### Why does the app process one file at a time, up to 1 GiB?
 
-It means that your browser doesn't support the server-worker fetch api. Hence, you are limited to small size files. see [Limitations](#limitations) for more info.
+Your browser uses single-file mode because streaming is unavailable or unsuitable in that environment. Available memory may require a smaller file. See [Limitations](#limitations) for more information.
 
 <hr style="height: 1px" id="why-need-private-key">
 
@@ -344,7 +255,7 @@ But make sure to never share your private key with anyone!
 
 ### Why the app asks for my private key in the public key encryption mode?
 
-Hatsmith uses authenticated encryption. The sender must provide their private key, a new shared key will be computed from both keys to encrypt the file. Recipient has to provide their private key when decrypting also. this way can verify that the encrypted file was not tampered with, and was sent from the real sender.
+Veli uses authenticated encryption. The sender must provide their private key, a new shared key will be computed from both keys to encrypt the file. Recipient has to provide their private key when decrypting also. this way can verify that the encrypted file was not tampered with, and was sent from the real sender.
 
 <hr style="height: 1px">
 
@@ -358,7 +269,7 @@ Also, if you feel that your private key has been compromised (e.g accidentally s
 
 ### How do I generate a keypair (Public & Private)?
 
-You can generate keys by visit the [key generate page](https://hatsmith.vercel.app/generate-keys), make sure to [store the keys safely](#best-practices).
+You can generate keys by visit the [key generate page](/generate-keys/), make sure to [store the keys safely](#best-practices).
 
 <hr style="height: 1px">
 
@@ -376,7 +287,7 @@ Once you visit the site and the page loads, it runs only offline.
 
 ### How can I contribute?
 
-Hatsmith is an open-source application. You can help make it better by making commits on GitHub. The project is maintained in my free time. 
+Veli is an open-source application. You can contribute through the [current repository](https://github.com/mksdr/Veli).
 <!-- [Donations](https://github.com/sh-dv/hat.sh#donations) of any size are appreciated. -->
 
 <hr style="height: 1px">
@@ -389,13 +300,11 @@ Please report bugs via [Github] by opening an issue labeled with "bug".
 
 ### How do I report a security vulnerability?
 
-If you identify a valid security issue, please write an email to hatsh-security@pm.me
-
-There is no bounty available at the moment, but your github account will be credited in the acknowledgements section in the app documentation.
+Review the reporting options on [Veli's Security page](https://github.com/mksdr/Veli/security) before sharing vulnerability details.
 
 <hr style="height: 1px">
 
-### Why should I use Hatsmith?
+### Why should I use Veli?
 
 1. The app uses fast modern secure cryptographic algorithms.
 2. It's super fast and easy to use.
@@ -404,7 +313,7 @@ There is no bounty available at the moment, but your github account will be cred
 
 <hr style="height: 1px">
 
-### When should I not use Hatsmith?
+### When should I not use Veli?
 
 1. If you want to encrypt a disk (e.g [VeraCrypt]).
 2. If you want to frequently access encrypted files (e.g [Cryptomator]).
@@ -505,7 +414,7 @@ The `crypto_secretstream_xchacha20poly1305_push()` function encrypts the file `c
 
 the XChaCha20 stream cipher Poly1305 MAC authentication are used for encryption.
 
-`stream.enqueue()` function adds the Hatsmith signature(magic bytes), salt and header followed by the encrypted chunks.
+`stream.enqueue()` function adds the Veli signature(magic bytes), salt and header followed by the encrypted chunks.
 
 ### File Decryption (stream)
 
@@ -629,13 +538,12 @@ Internally, XChaCha20 works like a block cipher used in counter mode. It uses th
 [xchacha20-poly1305]: https://libsodium.gitbook.io/doc/secret-key_cryptography/aead/chacha20-poly1305/xchacha20-poly1305_construction
 [argon2id]: https://github.com/p-h-c/phc-winner-argon2
 [x25519]: https://cr.yp.to/ecdh.html
-[opensource]: https://github.com/sh-dv/hat.sh
+[opensource]: https://github.com/mksdr/Veli
 [bitwarden]: https://bitwarden.com/
 [extending the salsa20 nonce paper]: https://cr.yp.to/snuffle/xsalsa-20081128.pdf
 [soon]: https://tools.ietf.org/html/draft-irtf-cfrg-xchacha
-[github]: https://github.com/sh-dv/hat.sh
+[github]: https://github.com/mksdr/Veli
 [veracrypt]: https://veracrypt.fr
 [cryptomator]: https://cryptomator.org
 [kryptor]: https://github.com/samuel-lucas6/Kryptor
 [gpg]: https://gnupg.org
-[docker hub]: https://hub.docker.com/r/shdv/hat.sh
