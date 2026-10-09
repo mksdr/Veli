@@ -10,6 +10,7 @@ export interface FileInfo {
     sha1?: string;
     md5?: string;
   };
+  hashesUnavailable?: boolean;
 }
 
 export class FileUtils {
@@ -36,6 +37,12 @@ export class FileUtils {
   }
 
   static async getFileInfo(file: File): Promise<FileInfo> {
+    if (file.size > 32 * 1024 * 1024 || !globalThis.crypto?.subtle) {
+      return {
+        name: file.name, size: file.size, type: file.type,
+        lastModified: new Date(file.lastModified), hashes: {}, hashesUnavailable: true,
+      };
+    }
     const buffer = await this.readFileAsArrayBuffer(file);
 
     const [sha256, sha1] = await Promise.all([

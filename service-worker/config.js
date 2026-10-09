@@ -1,4 +1,3 @@
-const APP_URL = self.location.origin + "/file";
 const encoder = new TextEncoder();
 const decoder = new TextDecoder();
 const sigCodes = {
@@ -8,7 +7,6 @@ const sigCodes = {
 };
 
 module.exports = {
-  APP_URL,
   encoder,
   decoder,
   sigCodes,

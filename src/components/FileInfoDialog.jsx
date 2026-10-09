@@ -8,7 +8,7 @@ import {
   Typography,
   CircularProgress
 } from '@mui/material';
-import { FileUtils, FileInfo } from '../utils/fileUtils';
+import { FileUtils } from '../utils/fileUtils';
 import { getTranslations as t } from '../../locales';
 // interface FileInfoDialogProps {
 //   file: File | null;
@@ -19,16 +19,22 @@ import { getTranslations as t } from '../../locales';
 const FileInfoDialog = ({ file, display, onClose }) => {
   const [fileInfo, setFileInfo] = useState(null);
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState(false);
 
   useEffect(() => {
+    let active = true;
+    setFileInfo(null);
+    setError(false);
     if (display && file) {
       setLoading(true);
       FileUtils.getFileInfo(file)
-        .then(info => setFileInfo(info))
-        .finally(() => setLoading(false));
+        .then(info => { if (active) setFileInfo(info); })
+        .catch(() => { if (active) setError(true); })
+        .finally(() => { if (active) setLoading(false); });
     } else {
-      setFileInfo(null); // reset when hidden
+      setLoading(false);
     }
+    return () => { active = false; };
   }, [file, display]);
 
   return (
@@ -45,12 +51,13 @@ const FileInfoDialog = ({ file, display, onClose }) => {
             <Typography><strong>{t('fi_last_modified')}:</strong> {fileInfo.lastModified.toLocaleString()}</Typography>
 
             <Typography variant="h6" sx={{ mt: 2 }}>{t('fi_hashes')}</Typography>
+            {fileInfo.hashesUnavailable && <Typography>{t('file_hash_limit')}</Typography>}
             <Typography><strong>SHA-256:</strong> {fileInfo.hashes.sha256}</Typography>
             <Typography><strong>SHA-1:</strong> {fileInfo.hashes.sha1}</Typography>
             <Typography><strong>MD5:</strong> {fileInfo.hashes.md5}</Typography>
           </>
         ) : (
-          <Typography>No file selected.</Typography>
+          <Typography>{error ? t('file_info_error') : "No file selected."}</Typography>
         )}
       </DialogContent>
     </Dialog>

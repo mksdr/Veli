@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useState } from "react";
 
 import Alert from "@mui/material/Alert";
 import IconButton from "@mui/material/IconButton";
@@ -10,24 +10,6 @@ import { getTranslations as t} from "../../../locales";
 const LimitedAlert = () => {
 
     const [alertOpen, setAlertOpen] = useState(true);
-    const [browser, setBrowser] = useState();
-
-    useEffect(() => {
-        const safariBrowser =
-          /Safari/.test(navigator.userAgent) &&
-          /Apple Computer/.test(navigator.vendor);
-    
-        const mobileBrowser =
-          /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(
-            navigator.userAgent
-          );
-    
-        safariBrowser
-          ? setBrowser("safari")
-          : mobileBrowser
-          ? setBrowser("mobile")
-          : setBrowser("other");
-      }, []);
 
 
     return (
@@ -47,11 +29,7 @@ const LimitedAlert = () => {
             </IconButton>
           }
         >
-          {browser === "safari"
-            ? t('limited_safari')
-            : browser === "mobile"
-            ? t('limited_mobile')
-            : t('limited_private')}
+          {t('buffered_mode_notice')}
         </Alert>
       </Collapse>
     )

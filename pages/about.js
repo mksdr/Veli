@@ -1,3 +1,4 @@
+import { getStoredValue } from "../src/utils/storage";
 /* eslint-disable @next/next/no-html-link-for-pages */
 /* eslint-disable @next/next/no-img-element */
 import fs from "fs";
@@ -238,7 +239,7 @@ export default function About(props) {
   useEffect(() => {
     const getLocale = () => {
       if (typeof window !== "undefined") {
-        let language = window.localStorage.getItem("language");
+        let language = getStoredValue("language");
         let userLanguage = navigator.language.replace("-", "_");
         return language ? language : locales[userLanguage] ? userLanguage : "en_US";
       }

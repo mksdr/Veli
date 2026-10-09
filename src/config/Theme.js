@@ -1,3 +1,4 @@
+import { getStoredValue, setStoredValue } from "../utils/storage";
 import { createTheme } from "@mui/material/styles";
 import { FormControlLabel, Switch } from "@mui/material";
 import { useState } from "react";
@@ -115,12 +116,12 @@ const DarkModeSwitch = styled(Switch)(({ theme }) => ({
 export const checkTheme = () => {
   
   if (typeof window !== "undefined") {
-    let darkMode = window.localStorage.getItem("darkTheme");
+    let darkMode = getStoredValue("darkTheme");
 
     if (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) {
-      if (localStorage) {
+      {
         if(darkMode != 0) {
-          localStorage.setItem("darkTheme", "1");
+          setStoredValue("darkTheme", "1");
           document.querySelector("html").classList.add("darkStyle");
         }
       }
@@ -147,13 +148,13 @@ export const DarkModeLight = () => {
     return;
   }
   const changeTheme = () => {
-    if (localStorage) {
+    {
       if (!checked) {
-        localStorage.setItem("darkTheme", "1");
+        setStoredValue("darkTheme", "1");
         document.querySelector("html").classList.add("darkStyle");
         setchecked(true)
       } else {
-        localStorage.setItem("darkTheme", "0");
+        setStoredValue("darkTheme", "0");
         document.querySelector("html").classList.remove("darkStyle");
         setchecked(false)
       }
@@ -171,16 +172,16 @@ export const DarkModeLight = () => {
 
 
 export const DarkMode = () => {
-  const [checked, setchecked] = useState(document.querySelector("html").classList.contains("darkStyle"))
+  const [checked, setchecked] = useState(typeof document !== "undefined" && document.querySelector("html").classList.contains("darkStyle"))
 
   const changeTheme = () => {
-    if (localStorage) {
+    {
       if (!checked) {
-        localStorage.setItem("darkTheme", "1");
+        setStoredValue("darkTheme", "1");
         document.querySelector("html").classList.add("darkStyle");
         setchecked(true)
       } else {
-        localStorage.setItem("darkTheme", "0");
+        setStoredValue("darkTheme", "0");
         document.querySelector("html").classList.remove("darkStyle");
         setchecked(false)
       }
