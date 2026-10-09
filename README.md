@@ -67,7 +67,30 @@ We officially support the last two versions of every major browser. Specifically
 - **Safari** on iOS and macOS
 - **Edge** on Windows
 
-Safari and Mobile browsers are limited to single 1GB files, due to lack of support with server-worker fetch api.
+Safari and mobile browsers use a buffered single-file path with a 1 GiB input
+limit. This is an upper bound, not a guarantee that a device has enough memory.
+Smaller files are recommended on iPhone and iPad. File-information hashes are
+calculated only for files up to 32 MiB.
+
+## Verification
+
+Use Node.js 22 or newer.
+
+```sh
+CYPRESS_INSTALL_BINARY=0 npm ci
+npm run test:security
+npm run build
+npx playwright install --with-deps chromium firefox webkit
+npm run test:browser
+```
+
+The browser suite covers Chromium, Firefox, desktop WebKit, and iPhone/iPad
+WebKit profiles. These profiles do not replace real iOS device testing.
+Tests compare downloaded plaintext bytes with the original file and reject
+incomplete or tampered ciphertext.
+
+See the [security and browser review](docs/security-browser-review.md) for
+findings, validation scope, and remaining device/toolchain follow-up.
 
 <br>
 

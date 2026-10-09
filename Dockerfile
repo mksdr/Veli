@@ -1,10 +1,10 @@
-FROM node:alpine as builder
+FROM node:22-alpine as builder
 
 WORKDIR /app
 
 COPY package*.json ./
 
-RUN npm install
+RUN CYPRESS_INSTALL_BINARY=0 npm ci
 
 COPY . ./
 

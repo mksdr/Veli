@@ -1,3 +1,4 @@
+import { downloadBlob } from "../../utils/downloadBlob";
 /* eslint-disable @next/next/no-img-element */
 import { useState, useEffect } from "react";
 import { useRouter } from "next/router";
@@ -166,6 +167,14 @@ let file,
 
 const LimitedEncryptionPanel = () => {
   const classes = useStyles();
+  useEffect(() => () => { limitedEncFileBuff = null; }, []);
+  const [operationError, setOperationError] = useState(false);
+  const handleOperationError = () => {
+    limitedEncFileBuff = null;
+    limitedState = null;
+    setIsEncrypting(false);
+    setOperationError(true);
+  };
 
   const router = useRouter();
 
@@ -243,6 +252,9 @@ const LimitedEncryptionPanel = () => {
   };
 
   const handleReset = () => {
+    setOperationError(false);
+    limitedKey = null;
+    limitedState = null;
     setActiveStep(0);
     setFile();
     setPassword();
@@ -296,6 +308,8 @@ const LimitedEncryptionPanel = () => {
   };
 
   const handleLimitedFileInput = (selectedFile) => {
+    if (!selectedFile) return;
+    setOperationError(false);
     file = selectedFile;
 
     if (file.size > MAX_FILE_SIZE) {
@@ -410,17 +424,18 @@ const LimitedEncryptionPanel = () => {
   };
 
   const handleEncryptionRequest = async () => {
-    if (encryptionMethod === "secretKey") {
-      await limitedEncKeyGenerator(Password);
+    setOperationError(false);
+    try {
+      limitedState = null;
+      if (encryptionMethod === "secretKey") {
+        await limitedEncKeyGenerator(Password);
+      } else {
+        await encKeyPair(PrivateKey, PublicKey, "derive");
+      }
+      if (!limitedState) throw new Error("Invalid keys");
       startLimitedEncryption(File);
-    }
-
-    if (encryptionMethod === "publicKey") {
-      let mode = "derive";
-      let privateKey = PrivateKey;
-      let publicKey = PublicKey;
-      await encKeyPair(privateKey, publicKey, mode);
-      startLimitedEncryption(File);
+    } catch {
+      handleOperationError();
     }
   };
 
@@ -443,6 +458,8 @@ const LimitedEncryptionPanel = () => {
       sodium.crypto_secretstream_xchacha20poly1305_init_push(limitedKey);
     limitedState = limitedRes.state;
     limitedHeader = limitedRes.header;
+    sodium.memzero(limitedKey);
+    limitedKey = null;
   };
 
   const startLimitedEncryption = (file) => {
@@ -463,8 +480,8 @@ const LimitedEncryptionPanel = () => {
         .then((chunk) => {
           limitedIndex = CHUNK_SIZE;
           let limitedLast = limitedIndex >= file.size;
-          limitedChunkEncryption(limitedLast, chunk, file);
-        });
+          return limitedChunkEncryption(limitedLast, chunk, file);
+        }).catch(handleOperationError);
     }
 
     if (encryptionMethod === "publicKey") {
@@ -483,8 +500,8 @@ const LimitedEncryptionPanel = () => {
         .then((chunk) => {
           limitedIndex = CHUNK_SIZE;
           let limitedLast = limitedIndex >= file.size;
-          limitedChunkEncryption(limitedLast, chunk, file);
-        });
+          return limitedChunkEncryption(limitedLast, chunk, file);
+        }).catch(handleOperationError);
     }
   };
 
@@ -523,8 +540,8 @@ const LimitedEncryptionPanel = () => {
         limitedIndex += CHUNK_SIZE;
         let limitedLast = limitedIndex >= file.size;
 
-        limitedChunkEncryption(limitedLast, chunk, file);
-      });
+        return limitedChunkEncryption(limitedLast, chunk, file);
+      }).catch(handleOperationError);
   };
 
   const handleFinishedEncryption = () => {
@@ -541,11 +558,7 @@ const LimitedEncryptionPanel = () => {
     }
     let fileName = File.name + ".enc";
     let blob = new Blob(limitedEncFileBuff);
-    let link = document.createElement("a");
-    link.href = window.URL.createObjectURL(blob);
-    link.download = fileName;
-    document.body.appendChild(link);
-    link.click();
+    downloadBlob(blob, fileName);
   };
 
   const createShareableLink = async () => {
@@ -577,6 +590,7 @@ const LimitedEncryptionPanel = () => {
 
   return (
     <div className={classes.root} {...getRootProps()}>
+      {operationError && <Alert severity="error">{t("file_processing_error")}</Alert>}
       <Snackbar
         anchorOrigin={{
           vertical: "bottom",

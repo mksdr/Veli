@@ -9,6 +9,7 @@ import { Alert } from "@mui/material";
 import { checkLocale } from "../../locales";
 import { getTranslations as t } from "../../locales";
 import locales from "../../locales/locales";
+import { setStoredValue } from "../utils/storage";
 
 const useStyles = makeStyles((theme) => ({
   formControl: {
@@ -25,9 +26,7 @@ const Language = () => {
 
   const handleLanguageChange = (e) => {
     setLanguage(e.target.value);
-    if (localStorage) {
-      localStorage.setItem("language", e.target.value);
-    }
+    setStoredValue("language", e.target.value);
     window.location.reload(true);
   };
 

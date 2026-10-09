@@ -1,4 +1,9 @@
 const en_US = {
+  file_processing_error: "File processing failed. The file may be damaged or incomplete, or the download was cancelled. Please try again.",
+  file_hash_limit: "Hashes are calculated only for files up to 32 MiB to limit memory use.",
+  file_info_error: "Could not read file information.",
+  buffered_mode_notice: "Single-file mode: up to 1 GiB. Available device memory may require smaller files.",
+
   language_name: "English",
   
   // Menu

@@ -207,8 +207,31 @@ let file,
   privateKey,
   publicKey;
 
+let operationId, downloadUrl, nextFileTimer;
+const postToWorker = (worker, data, transfer = []) =>
+  worker.postMessage({ ...data, operationId }, transfer);
+const cancelOperation = () => {
+  clearTimeout(nextFileTimer);
+  if (operationId && navigator.serviceWorker.controller) {
+    postToWorker(navigator.serviceWorker.controller, { cmd: "cancelOperation" });
+  }
+  operationId = null;
+  downloadUrl = null;
+};
+
 export default function DecryptionPanel() {
   const classes = useStyles();
+
+  const [operationError, setOperationError] = useState(false);
+  const handleOperationError = () => {
+    cancelOperation();
+    setOperationError(true);
+    setIsDownloading(false);
+    setIsTestingPassword(false);
+    setIsTestingKeys(false);
+    setIsCheckingFile(false);
+  };
+
 
   const router = useRouter();
 
@@ -282,6 +305,9 @@ export default function DecryptionPanel() {
   };
 
   const handleReset = () => {
+    cancelOperation();
+    setOperationError(false);
+    password = null;
     setActiveStep(0);
     setFiles([]);
     setPassword();
@@ -368,12 +394,12 @@ export default function DecryptionPanel() {
         file.slice(0, 11).arrayBuffer(), //signatures
         file.slice(0, 22).arrayBuffer(), //v1 signature
       ]).then(([signature, legacy]) => {
-        reg.active.postMessage({
+        postToWorker(reg.active, {
           cmd: "checkFile",
           signature,
           legacy,
         });
-      });
+      }).catch(handleOperationError);
     });
   };
 
@@ -443,7 +469,7 @@ export default function DecryptionPanel() {
             .arrayBuffer(), //17
         ]).then(([signature, salt, header, chunk]) => {
           decFileBuff = chunk; //for testing the dec password
-          reg.active.postMessage({
+          postToWorker(reg.active, {
             cmd: "requestTestDecryption",
             password,
             signature,
@@ -451,7 +477,7 @@ export default function DecryptionPanel() {
             header,
             decFileBuff,
           });
-        });
+        }).catch(handleOperationError);
       });
     }
 
@@ -474,7 +500,7 @@ export default function DecryptionPanel() {
             .arrayBuffer(), //17
         ]).then(([header, chunk]) => {
           decFileBuff = chunk;
-          reg.active.postMessage({
+          postToWorker(reg.active, {
             cmd: "requestDecKeyPair",
             privateKey,
             publicKey,
@@ -482,7 +508,7 @@ export default function DecryptionPanel() {
             decFileBuff,
             mode,
           });
-        });
+        }).catch(handleOperationError);
       });
     }
   };
@@ -533,21 +559,24 @@ export default function DecryptionPanel() {
   };
 
   const prepareFile = () => {
+    setOperationError(false);
     // send file name to sw
-    let fileName = encodeURIComponent(formatName(files[currFile].name));
+    let fileName = formatName(files[currFile].name);
     navigator.serviceWorker.ready.then((reg) => {
-      reg.active.postMessage({ cmd: "prepareFileNameDec", fileName });
-    });
+      postToWorker(reg.active, { cmd: "prepareFileNameDec", fileName });
+    }).catch(handleOperationError);
   };
 
   const kickOffDecryption = async (e) => {
+    const currentOperation = operationId;
     if (currFile <= numberOfFiles - 1) {
       file = files[currFile];
-      window.open(`file`, "_self");
+      window.open(downloadUrl, "_self");
       setIsDownloading(true);
 
       if (decryptionMethodState === "secretKey") {
         navigator.serviceWorker.ready.then((reg) => {
+          if (currentOperation !== operationId) return;
           Promise.all([
             file.slice(0, 11).arrayBuffer(), //signature
             file.slice(11, 27).arrayBuffer(), //salt
@@ -559,19 +588,21 @@ export default function DecryptionPanel() {
               )
               .arrayBuffer(), //17
           ]).then(([signature, salt, header, chunk]) => {
-            reg.active.postMessage({
+            if (currentOperation !== operationId) return;
+            postToWorker(reg.active, {
               cmd: "requestDecryption",
               password,
               signature,
               salt,
               header,
             });
-          });
-        });
+          }).catch(() => { if (currentOperation === operationId) handleOperationError(); });
+        }).catch(() => { if (currentOperation === operationId) handleOperationError(); });
       }
 
       if (decryptionMethodState === "publicKey") {
         navigator.serviceWorker.ready.then((reg) => {
+          if (currentOperation !== operationId) return;
           let mode = "derive";
 
           Promise.all([
@@ -583,8 +614,9 @@ export default function DecryptionPanel() {
               )
               .arrayBuffer(), //17
           ]).then(([header, chunk]) => {
+            if (currentOperation !== operationId) return;
             decFileBuff = chunk;
-            reg.active.postMessage({
+            postToWorker(reg.active, {
               cmd: "requestDecKeyPair",
               privateKey,
               publicKey,
@@ -592,8 +624,8 @@ export default function DecryptionPanel() {
               decFileBuff,
               mode,
             });
-          });
-        });
+          }).catch(() => { if (currentOperation === operationId) handleOperationError(); });
+        }).catch(() => { if (currentOperation === operationId) handleOperationError(); });
       }
     } else {
       // console.log("out of files")
@@ -601,6 +633,7 @@ export default function DecryptionPanel() {
   };
 
   const startDecryption = (method) => {
+    const currentOperation = operationId;
     let startIndex;
     if (method === "secretKey") startIndex = 51;
     if (method === "publicKey") startIndex = 35;
@@ -608,6 +641,7 @@ export default function DecryptionPanel() {
     file = files[currFile];
 
     navigator.serviceWorker.ready.then((reg) => {
+      if (currentOperation !== operationId) return;
       file
         .slice(
           startIndex,
@@ -615,22 +649,25 @@ export default function DecryptionPanel() {
         )
         .arrayBuffer()
         .then((chunk) => {
+          if (currentOperation !== operationId) return;
           index =
             startIndex +
             CHUNK_SIZE +
             crypto_secretstream_xchacha20poly1305_ABYTES;
-          reg.active.postMessage(
+          postToWorker(reg.active,
             { cmd: "decryptFirstChunk", chunk, last: index >= file.size },
             [chunk]
           ); // transfer chunk ArrayBuffer to service worker
-        });
+        }).catch(() => { if (currentOperation === operationId) handleOperationError(); });
     });
   };
 
   const continueDecryption = (e) => {
+    const currentOperation = operationId;
     file = files[currFile];
 
     navigator.serviceWorker.ready.then((reg) => {
+      if (currentOperation !== operationId) return;
       file
         .slice(
           index,
@@ -638,12 +675,13 @@ export default function DecryptionPanel() {
         )
         .arrayBuffer()
         .then((chunk) => {
+          if (currentOperation !== operationId) return;
           index += CHUNK_SIZE + crypto_secretstream_xchacha20poly1305_ABYTES;
-          e.source.postMessage(
+          postToWorker(e.source,
             { cmd: "decryptRestOfChunks", chunk, last: index >= file.size },
             [chunk]
           );
-        });
+        }).catch(() => { if (currentOperation === operationId) handleOperationError(); });
     });
   };
 
@@ -658,8 +696,14 @@ export default function DecryptionPanel() {
   }, [query.publicKey, query.tab]);
 
   useEffect(() => {
-    navigator.serviceWorker.addEventListener("message", (e) => {
+    const onMessage = (e) => {
+      if (!e.data || (e.data.kind && e.data.kind !== "decryption")) return;
+      if (e.data.operationId && e.data.operationId !== operationId &&
+          e.data.reply !== "filePreparedDec") return;
       switch (e.data.reply) {
+        case "operationError":
+          handleOperationError();
+          break;
         case "badFile":
           if (numberOfFiles > 1) {
             setbadFile(files[currFile].name);
@@ -758,6 +802,8 @@ export default function DecryptionPanel() {
           break;
 
         case "filePreparedDec":
+          operationId = e.data.operationId;
+          downloadUrl = e.data.downloadUrl;
           kickOffDecryption();
           break;
 
@@ -790,7 +836,7 @@ export default function DecryptionPanel() {
             file = null;
             index = null;
             if (currFile <= numberOfFiles - 1) {
-              setTimeout(function () {
+              nextFileTimer = setTimeout(function () {
                 prepareFile();
               }, 1000);
             } else {
@@ -803,17 +849,22 @@ export default function DecryptionPanel() {
           }
           break;
       }
-    });
+    };
+    navigator.serviceWorker.addEventListener("message", onMessage);
+    return () => {
+      navigator.serviceWorker.removeEventListener("message", onMessage);
+      cancelOperation();
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
   const [selectedFile, setSelectedFile] = useState(null);
     const [showInfo, setShowInfo] = useState(false);
-  
+
     const handleOpenInfo = (file) => {
       setSelectedFile(file);
       setShowInfo(true);
     };
-  
+
     const handleCloseInfo = () => {
       setShowInfo(false);
       setSelectedFile(null);
@@ -821,6 +872,7 @@ export default function DecryptionPanel() {
 
   return (
     <div className={classes.root} {...getRootProps()}>
+      {operationError && <Alert severity="error">{t("file_processing_error")}</Alert>}
       <Backdrop open={isDragActive} style={{ zIndex: 10 }}>
         <Typography
           variant="h2"
