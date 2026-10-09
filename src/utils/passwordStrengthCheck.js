@@ -57,7 +57,6 @@ zxcvbnOptions.setOptions(options)
 const passwordStrengthCheck = (password) => {
   
   let strengthResult = zxcvbn(password);
-  console.log(strengthResult);
   let score = strengthResult.score;
   let crackTimeInSeconds = strengthResult.crackTimesSeconds.offlineSlowHashing1e4PerSecond;
   let crackTime = display_time(crackTimeInSeconds);

@@ -1,3 +1,5 @@
+import { downloadBlob } from "../../utils/downloadBlob";
+import { decryptFile } from "../../utils/decryptFile";
 /* eslint-disable @next/next/no-img-element */
 import { useState, useEffect } from "react";
 import { useRouter } from "next/router";
@@ -153,6 +155,18 @@ let file,
 
 const LimitedDecryptionPanel = () => {
   const classes = useStyles();
+  useEffect(() => () => { limitedDecFileBuff = null; }, []);
+  const [operationError, setOperationError] = useState(false);
+  const handleOperationError = () => {
+    limitedDecFileBuff = null;
+    limitedTestDecFileBuff = null;
+    setIsDecrypting(false);
+    setIsTestingPassword(false);
+    setIsTestingKeys(false);
+    setIsCheckingFile(false);
+    setOperationError(true);
+    setActiveStep(1);
+  };
 
   const [activeStep, setActiveStep] = useState(0);
 
@@ -225,6 +239,10 @@ const LimitedDecryptionPanel = () => {
   };
 
   const handleReset = () => {
+    limitedDecFileBuff = null;
+    limitedTestDecFileBuff = null;
+    setOperationError(false);
+    setIsDecrypting(false);
     setActiveStep(0);
     setFile();
     setPassword();
@@ -244,6 +262,8 @@ const LimitedDecryptionPanel = () => {
   };
 
   const handleLimitedFileInput = (selectedFile) => {
+    if (!selectedFile) return;
+    setOperationError(false);
     file = selectedFile;
 
     if (file.size > MAX_FILE_SIZE) {
@@ -288,7 +308,7 @@ const LimitedDecryptionPanel = () => {
         setbadFile(true);
         setIsCheckingFile(false);
       }
-    });
+    }).catch(handleOperationError);
   };
 
   const handlePasswordInput = (selectedPassword) => {
@@ -367,6 +387,7 @@ const LimitedDecryptionPanel = () => {
   };
 
   const testLimitedDecryption = async () => {
+    setOperationError(false);
     await _sodium.ready;
     const sodium = _sodium;
 
@@ -417,7 +438,7 @@ const LimitedDecryptionPanel = () => {
           if (decLimitedTestresults) {
             setIsTestingPassword(false);
 
-            limitedDecKeyGenerator(
+            return limitedDecKeyGenerator(
               limitedTestPassword,
               limitedTestSalt,
               limitedTestHeader
@@ -427,7 +448,7 @@ const LimitedDecryptionPanel = () => {
             setWrongPassword(true);
           }
         }
-      });
+      }).catch(handleOperationError);
     }
 
     if (decryptionMethod === "publicKey") {
@@ -527,7 +548,7 @@ const LimitedDecryptionPanel = () => {
           setKeysErrorMessage(t("invalid_keys_input"));
           setIsTestingKeys(false);
         }
-      });
+      }).catch(handleOperationError);
     }
   };
 
@@ -554,82 +575,24 @@ const LimitedDecryptionPanel = () => {
         limitedDecHeader,
         limitedDecKey
       );
+    sodium.memzero(limitedDecKey);
 
     if (limitedDecState) {
-      startLimitedDecryption("secretKey", limitedDecState);
+      return startLimitedDecryption("secretKey", limitedDecState);
     }
   };
 
-  const startLimitedDecryption = (method, dec_state) => {
-    let startIndex;
-    if (method === "secretKey") startIndex = 51;
-    if (method === "publicKey") startIndex = 35;
-
+  const startLimitedDecryption = async (method, decState) => {
     setIsDecrypting(true);
-
-    limitedDecFileBuff = [];
-
-    file = File;
-
-    file
-      .slice(
-        startIndex,
-        startIndex + CHUNK_SIZE + crypto_secretstream_xchacha20poly1305_ABYTES
-      )
-      .arrayBuffer()
-      .then((chunk) => {
-        limitedDecIndex =
-          startIndex +
-          CHUNK_SIZE +
-          crypto_secretstream_xchacha20poly1305_ABYTES;
-        let limitedDecLast = limitedDecIndex >= file.size;
-        limitedChunkDecryption(limitedDecLast, chunk, dec_state);
-      });
-  };
-
-  const continueLimitedDecryption = (dec_state) => {
-    file = File;
-
-    file
-      .slice(
-        limitedDecIndex,
-        limitedDecIndex +
-          CHUNK_SIZE +
-          crypto_secretstream_xchacha20poly1305_ABYTES
-      )
-      .arrayBuffer()
-      .then((chunk) => {
-        limitedDecIndex +=
-          CHUNK_SIZE + crypto_secretstream_xchacha20poly1305_ABYTES;
-        let limitedDecLast = limitedDecIndex >= file.size;
-        limitedChunkDecryption(limitedDecLast, chunk, dec_state);
-      });
-  };
-
-  const limitedChunkDecryption = async (limitedDecLast, chunk, dec_state) => {
-    await _sodium.ready;
-    const sodium = _sodium;
-
-    let limitedDecResult = sodium.crypto_secretstream_xchacha20poly1305_pull(
-      dec_state,
-      new Uint8Array(chunk)
-    );
-
-    if (limitedDecResult) {
-      let limitedDecryptedChunk = limitedDecResult.message;
-
-      limitedDecFileBuff.push(new Uint8Array(limitedDecryptedChunk));
-
-      if (limitedDecLast) {
-        handleFinishedDecryption();
-        // showLimitedDecModal();
-      }
-      if (!limitedDecLast) {
-        continueLimitedDecryption(dec_state);
-      }
-    } else {
-      setWrongPassword(true);
-      setIsTestingPassword(false);
+    setOperationError(false);
+    limitedDecFileBuff = null;
+    try {
+      limitedDecFileBuff = await decryptFile(
+        _sodium, File, decState, method === "secretKey" ? 51 : 35, CHUNK_SIZE
+      );
+      handleFinishedDecryption();
+    } catch {
+      handleOperationError();
     }
   };
 
@@ -649,11 +612,7 @@ const LimitedDecryptionPanel = () => {
 
     let blob = new Blob(limitedDecFileBuff);
 
-    let link = document.createElement("a");
-    link.href = window.URL.createObjectURL(blob);
-    link.download = fileName;
-    document.body.appendChild(link);
-    link.click();
+    downloadBlob(blob, fileName);
   };
 
   useEffect(() => {
@@ -678,6 +637,7 @@ const LimitedDecryptionPanel = () => {
 
   return (
     <div className={classes.root} {...getRootProps()}>
+      {operationError && <Alert severity="error">{t("file_processing_error")}</Alert>}
       <Backdrop open={isDragActive} style={{ zIndex: 10 }}>
         <Typography
           variant="h2"

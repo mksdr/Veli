@@ -215,8 +215,28 @@ let file,
   privateKey,
   publicKey;
 
+let operationId, downloadUrl, nextFileTimer;
+const postToWorker = (worker, data, transfer = []) =>
+  worker.postMessage({ ...data, operationId }, transfer);
+const cancelOperation = () => {
+  clearTimeout(nextFileTimer);
+  if (operationId && navigator.serviceWorker.controller) {
+    postToWorker(navigator.serviceWorker.controller, { cmd: "cancelOperation" });
+  }
+  operationId = null;
+  downloadUrl = null;
+};
+
 export default function EncryptionPanel() {
   const classes = useStyles();
+
+  const [operationError, setOperationError] = useState(false);
+  const handleOperationError = () => {
+    cancelOperation();
+    setOperationError(true);
+    setIsDownloading(false);
+  };
+
 
   const router = useRouter();
 
@@ -297,6 +317,9 @@ export default function EncryptionPanel() {
   };
 
   const handleReset = () => {
+    cancelOperation();
+    setOperationError(false);
+    password = null;
     setActiveStep(0);
     setFiles([]);
     setPassword();
@@ -348,13 +371,13 @@ export default function EncryptionPanel() {
       navigator.serviceWorker.ready.then((reg) => {
         let mode = "test";
 
-        reg.active.postMessage({
+        postToWorker(reg.active, {
           cmd: "requestEncKeyPair",
           privateKey,
           publicKey,
           mode,
         });
-      });
+      }).catch(handleOperationError);
     }
   };
 
@@ -463,36 +486,40 @@ export default function EncryptionPanel() {
   };
 
   const prepareFile = () => {
+    setOperationError(false);
     // send file name to sw
-    let fileName = encodeURIComponent(files[currFile].name + ".enc");
+    let fileName = files[currFile].name + ".enc";
     navigator.serviceWorker.ready.then((reg) => {
-      reg.active.postMessage({ cmd: "prepareFileNameEnc", fileName });
-    });
+      postToWorker(reg.active, { cmd: "prepareFileNameEnc", fileName });
+    }).catch(handleOperationError);
   };
 
   const kickOffEncryption = async () => {
+    const currentOperation = operationId;
     if (currFile <= numberOfFiles - 1) {
       file = files[currFile];
-      window.open(`file`, "_self");
+      window.open(downloadUrl, "_self");
       setIsDownloading(true);
 
       if (encryptionMethodState === "publicKey") {
         navigator.serviceWorker.ready.then((reg) => {
+          if (currentOperation !== operationId) return;
           let mode = "derive";
 
-          reg.active.postMessage({
+          postToWorker(reg.active, {
             cmd: "requestEncKeyPair",
             privateKey,
             publicKey,
             mode,
           });
-        });
+        }).catch(() => { if (currentOperation === operationId) handleOperationError(); });
       }
 
       if (encryptionMethodState === "secretKey") {
         navigator.serviceWorker.ready.then((reg) => {
-          reg.active.postMessage({ cmd: "requestEncryption", password });
-        });
+          if (currentOperation !== operationId) return;
+          postToWorker(reg.active, { cmd: "requestEncryption", password });
+        }).catch(() => { if (currentOperation === operationId) handleOperationError(); });
       }
     } else {
       // console.log("out of files")
@@ -500,21 +527,24 @@ export default function EncryptionPanel() {
   };
 
   const startEncryption = (method) => {
+    const currentOperation = operationId;
     navigator.serviceWorker.ready.then((reg) => {
+      if (currentOperation !== operationId) return;
       file
         .slice(0, CHUNK_SIZE)
         .arrayBuffer()
         .then((chunk) => {
+          if (currentOperation !== operationId) return;
           index = CHUNK_SIZE;
 
           if (method === "secretKey") {
-            reg.active.postMessage(
+            postToWorker(reg.active,
               { cmd: "encryptFirstChunk", chunk, last: index >= file.size },
               [chunk]
             );
           }
           if (method === "publicKey") {
-            reg.active.postMessage(
+            postToWorker(reg.active,
               {
                 cmd: "asymmetricEncryptFirstChunk",
                 chunk,
@@ -523,22 +553,25 @@ export default function EncryptionPanel() {
               [chunk]
             );
           }
-        });
+        }).catch(() => { if (currentOperation === operationId) handleOperationError(); });
     });
   };
 
   const continueEncryption = (e) => {
+    const currentOperation = operationId;
     navigator.serviceWorker.ready.then((reg) => {
+      if (currentOperation !== operationId) return;
       file
         .slice(index, index + CHUNK_SIZE)
         .arrayBuffer()
         .then((chunk) => {
+          if (currentOperation !== operationId) return;
           index += CHUNK_SIZE;
-          e.source.postMessage(
+          postToWorker(e.source,
             { cmd: "encryptRestOfChunks", chunk, last: index >= file.size },
             [chunk]
           );
-        });
+        }).catch(() => { if (currentOperation === operationId) handleOperationError(); });
     });
   };
 
@@ -551,10 +584,10 @@ export default function EncryptionPanel() {
   useEffect(() => {
     const pingSW = setInterval(() => {
       navigator.serviceWorker.ready.then((reg) => {
-        reg.active.postMessage({
+        postToWorker(reg.active, {
           cmd: "pingSW",
         });
-      });
+      }).catch(handleOperationError);
     }, 15000);
     return () => clearInterval(pingSW);
   }, []);
@@ -570,8 +603,14 @@ export default function EncryptionPanel() {
   }, [query.publicKey, query.tab]);
 
   useEffect(() => {
-    navigator.serviceWorker.addEventListener("message", (e) => {
+    const onMessage = (e) => {
+      if (!e.data || (e.data.kind && e.data.kind !== "encryption")) return;
+      if (e.data.operationId && e.data.operationId !== operationId &&
+          e.data.reply !== "filePreparedEnc") return;
       switch (e.data.reply) {
+        case "operationError":
+          handleOperationError();
+          break;
         case "goodKeyPair":
           setActiveStep(2);
           break;
@@ -603,6 +642,8 @@ export default function EncryptionPanel() {
           break;
 
         case "filePreparedEnc":
+          operationId = e.data.operationId;
+          downloadUrl = e.data.downloadUrl;
           kickOffEncryption();
           break;
 
@@ -616,7 +657,7 @@ export default function EncryptionPanel() {
             file = null;
             index = null;
             if (currFile <= numberOfFiles - 1) {
-              setTimeout(function () {
+              nextFileTimer = setTimeout(function () {
                 prepareFile();
               }, 1000);
             } else {
@@ -629,7 +670,14 @@ export default function EncryptionPanel() {
           }
           break;
       }
-    });
+    };
+    navigator.serviceWorker.addEventListener("message", onMessage);
+    return () => {
+      navigator.serviceWorker.removeEventListener("message", onMessage);
+      cancelOperation();
+    };
+    // The handler reads the existing module-level queue; re-registering would cancel it.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
   const [selectedFile, setSelectedFile] = useState(null);
   const [showInfo, setShowInfo] = useState(false);
@@ -646,6 +694,7 @@ export default function EncryptionPanel() {
 
   return (
     <div className={classes.root} {...getRootProps()}>
+      {operationError && <Alert severity="error">{t("file_processing_error")}</Alert>}
       <Snackbar
         anchorOrigin={{
           vertical: "bottom",
@@ -756,7 +805,7 @@ export default function EncryptionPanel() {
                       : t("drag_drop_files")}
                   </List>
                 </Paper>
-                
+
                 <input
                   {...getInputProps()}
                   className={classes.input}

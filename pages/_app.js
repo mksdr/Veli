@@ -2,7 +2,7 @@
 import Head from "next/head";
 import { getTranslations as t } from "../locales";
 import "../public/assets/styles/style.css";
-import { ThemeProvider, CssBaseline } from "@mui/styles";
+import { ThemeProvider } from "@mui/material/styles";
 import { Theme, checkTheme } from "../src/config/Theme";
 // import { makeStyles, useTheme } from "@mui/styles";
 //check wether the user prefers/chose dark theme
