@@ -1,5 +1,12 @@
 # [CHANGELOG](#changelog)
 
+## v3.2.2 (2026-10-10)
+
+- Add Docker Hub publishing workflow and container deployment documentation.
+- Stabilize stalled streaming cancellation and password generation browser regression tests.
+
+---
+
 ## v3.2.1 (2026-10-10)
 
 - Configure weekly Dependabot updates for npm dependencies, Docker images, and GitHub Actions.

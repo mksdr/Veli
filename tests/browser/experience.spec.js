@@ -50,9 +50,13 @@ test("generated word password and clipboard denial offer a usable manual fallbac
     value: { writeText: () => Promise.reject(new DOMException("Denied", "NotAllowedError")) },
   }));
   await choose(page);
-  await page.getByRole("combobox", { name: "Generate Password", exact: true }).click();
+  const generator = page.getByRole("combobox", { name: "Generate Password", exact: true });
+  await generator.click();
   await page.getByRole("option", { name: "Memorable words", exact: true }).click();
-  await expect(page.getByRole("listbox")).toBeHidden();
+  // MUI sets aria-hidden before its exit transition finishes. Wait for the
+  // menu to unmount so its fading overlay cannot intercept the next click.
+  await expect(page.getByRole("listbox", { includeHidden: true })).toHaveCount(0);
+  await expect(generator).toHaveText("Memorable words");
   await page.getByRole("button", { name: "Create a password", exact: true }).click();
   const input = page.getByLabel(/^Password\s*\*?$/);
   await expect(input).not.toHaveValue("");
