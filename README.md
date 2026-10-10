@@ -8,7 +8,7 @@
 
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 
-Current version: **v3.2.1**. See the [changelog](CHANGELOG.md) for release details.
+Current version: **v3.2.2**. See the [changelog](CHANGELOG.md) for release details.
 
 Veli is a web app for local file encryption and decryption. Files are processed
 in your browser rather than uploaded to a server. Its interface guides you
@@ -98,7 +98,7 @@ The Docker Hub repository is [`mksdr/veli`](https://hub.docker.com/r/mksdr/veli)
 After an image has been published, run it with:
 
 ```sh
-docker run --rm -p 3991:80 mksdr/veli:3.2.1
+docker run --rm -p 3991:80 mksdr/veli:3.2.2
 ```
 
 Open `http://localhost:3991`. The container listens on port 80; the host port
@@ -108,7 +108,7 @@ can be changed as needed.
 
 The [Publish to Docker Hub workflow](.github/workflows/dockerhub-deploy.yml)
 builds Linux AMD64 and ARM64 images and publishes the package version (currently
-`3.2.1`) and `latest` to `mksdr/veli`. It first runs an AMD64 container and checks
+`3.2.2`) and `latest` to `mksdr/veli`. It first runs an AMD64 container and checks
 the main pages and service worker over HTTP.
 
 1. In Docker Home, open **Account settings → Personal access tokens** and create
@@ -122,7 +122,7 @@ the main pages and service worker over HTTP.
 5. Once the workflow succeeds, check the tags in
    [Docker Hub](https://hub.docker.com/r/mksdr/veli/tags).
 
-Later releases can also be published by pushing a Git tag such as `v3.2.1`.
+Later releases can also be published by pushing a Git tag such as `v3.2.2`.
 The tag must exactly match `v` followed by the version in `package.json`.
 Only stable `x.y.z` versions are accepted. Manual publishing is restricted to
 `master` in `mksdr/Veli`; each successful publication updates `latest`.
@@ -130,19 +130,19 @@ The existing GHCR workflow publishes separately.
 
 #### Publish from a local Docker installation
 
-To build and publish version 3.2.1 from the project directory:
+To build and publish version 3.2.2 from the project directory:
 
 ```sh
 docker login --username mksdr
-docker build --pull -t mksdr/veli:3.2.1 -t mksdr/veli:latest .
-docker run --rm -p 3991:80 mksdr/veli:3.2.1
+docker build --pull -t mksdr/veli:3.2.2 -t mksdr/veli:latest .
+docker run --rm -p 3991:80 mksdr/veli:3.2.2
 ```
 
 Check the app at `http://localhost:3991`, then stop the container with Ctrl+C
 and upload both tags:
 
 ```sh
-docker push mksdr/veli:3.2.1
+docker push mksdr/veli:3.2.2
 docker push mksdr/veli:latest
 ```
 
