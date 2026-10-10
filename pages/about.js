@@ -199,12 +199,13 @@ const useStyles = makeStyles((theme) => ({
     },
 
     "& blockquote": {
-      backgroundColor: "#f1f1f1",
+      backgroundColor: theme.palette.custom.gallery.main,
       marginTop: "15px",
-      color: "#535a60",
-      borderLeft: "5px solid #c8ccd0",
+      color: theme.palette.text.secondary,
+      borderLeft: `5px solid ${theme.palette.mode === "dark" ? "#58677a" : "#c8ccd0"}`,
       marginBottom: 20,
       "& p": {
+        color: "inherit",
         padding: 10,
       },
     },

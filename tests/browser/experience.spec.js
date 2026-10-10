@@ -227,3 +227,42 @@ for (const locale of [
     expect(errors).toEqual([]);
   });
 }
+
+test("about page blockquotes are readable and styled for dark mode", async ({ page }) => {
+  await page.addInitScript(() => {
+    localStorage.setItem("language", "en_US");
+    localStorage.setItem("darkTheme", "1");
+  });
+  await page.goto("/about/");
+  const blockquote = page.locator("blockquote").first();
+  await expect(blockquote).toBeVisible();
+  const darkBg = await blockquote.evaluate(el => getComputedStyle(el).backgroundColor);
+  const darkColor = await blockquote.evaluate(el => getComputedStyle(el).color);
+  const paragraph = blockquote.locator("p").first();
+  const darkPColor = await paragraph.evaluate(el => getComputedStyle(el).color);
+  const darkBorderLeft = await blockquote.evaluate(el => getComputedStyle(el).borderLeftColor);
+  expect(darkBg).toBe("rgb(40, 52, 67)");
+  expect(darkColor).toBe("rgb(174, 187, 201)");
+  expect(darkPColor).toBe("rgb(174, 187, 201)");
+  expect(darkBorderLeft).toBe("rgb(88, 103, 122)");
+});
+
+test("about page blockquotes are styled for light mode", async ({ page }) => {
+  await page.addInitScript(() => {
+    localStorage.setItem("language", "en_US");
+    localStorage.setItem("darkTheme", "0");
+  });
+  await page.goto("/about/");
+  const blockquote = page.locator("blockquote").first();
+  await expect(blockquote).toBeVisible();
+  const lightBg = await blockquote.evaluate(el => getComputedStyle(el).backgroundColor);
+  const lightColor = await blockquote.evaluate(el => getComputedStyle(el).color);
+  const paragraph = blockquote.locator("p").first();
+  const lightPColor = await paragraph.evaluate(el => getComputedStyle(el).color);
+  const lightBorderLeft = await blockquote.evaluate(el => getComputedStyle(el).borderLeftColor);
+  expect(lightBg).toBe("rgb(237, 241, 246)");
+  expect(lightColor).toBe("rgb(88, 103, 122)");
+  expect(lightPColor).toBe("rgb(88, 103, 122)");
+  expect(lightBorderLeft).toBe("rgb(200, 204, 208)");
+});
+
