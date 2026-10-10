@@ -1,5 +1,5 @@
 # Static output is independent of the runtime CPU architecture.
-FROM --platform=$BUILDPLATFORM node:22-alpine AS builder
+FROM --platform=$BUILDPLATFORM node:25-alpine AS builder
 
 WORKDIR /app
 
