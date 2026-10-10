@@ -1,5 +1,11 @@
 # [CHANGELOG](#changelog)
 
+## v3.2.1 (2026-10-10)
+
+- Configure weekly Dependabot updates for npm dependencies, Docker images, and GitHub Actions.
+
+---
+
 ## v3.2.0 (2026-10-10)
 
 - Migrate Service Worker bundler from Browserify to esbuild to eliminate 4 vulnerabilities in the legacy `crypto-browserify` / `elliptic` dependency chain.
