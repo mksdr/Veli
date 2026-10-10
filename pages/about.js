@@ -21,6 +21,7 @@ import { makeStyles, useTheme } from "@mui/styles";
 import Link from "next/link";
 import Container from "@mui/material/Container";
 import Button from "@mui/material/Button";
+import Box from "@mui/material/Box";
 import GitHubIcon from "@mui/icons-material/GitHub";
 import Footer from "../src/components/Footer";
 import BookmarkBorderIcon from "@mui/icons-material/BookmarkBorder";
@@ -291,7 +292,8 @@ export default function About(props) {
             <Toolbar>
 
               <Typography variant="h6" className={classes.logo}>
-                <a href="/">
+                <a href="/" style={{ display: "inline-flex", alignItems: "center", gap: 8 }}>
+                  <Box component="img" src="/assets/icons/veli.svg" alt="" aria-hidden="true" sx={{ width: 32, height: 32, flexShrink: 0 }} />
                   Veli
                 </a>
               </Typography>
