@@ -1,5 +1,13 @@
 # [CHANGELOG](#changelog)
 
+## v3.2.0 (2026-10-10)
+
+- Migrate Service Worker bundler from Browserify to esbuild to eliminate 4 vulnerabilities in the legacy `crypto-browserify` / `elliptic` dependency chain.
+- Optimize Service Worker bundle size by ~38.5% (1.44 MB to 886 KB) by removing unneeded Node polyfill packages.
+- Add dedicated `scripts/build-sw.js` with empty module stubs for `fs`, `path`, and `crypto` to ensure clean browser runtime compatibility for `libsodium-wrappers`.
+
+---
+
 ## v3.1.0 (2026-10-10)
 
 - Rebrand Hatsmith as Veli with a new logo, favicons, and updated project documentation, while retaining upstream credits.

@@ -1,10 +1,11 @@
 {
   "name": "veli",
-  "version": "3.1.0",
+  "version": "3.2.0",
   "private": true,
   "scripts": {
-    "dev": "browserify service-worker/sw.js -o public/service-worker.js && next dev",
-    "build": "browserify service-worker/sw.js -o public/service-worker.js && next build",
+    "build:sw": "node scripts/build-sw.js",
+    "dev": "npm run build:sw && next dev",
+    "build": "npm run build:sw && next build",
     "postbuild": "node ./post-build.js",
     "start": "next start -p 3991",
     "lint": "next lint",
@@ -36,10 +37,10 @@
     "@playwright/test": "1.58.2",
     "@types/node": "^22.15.3",
     "@types/react": "^18.3.20",
-    "browserify": "^17.0.0",
-    "cypress": "^14.4.1",
+    "cypress": "^16.1.1",
     "cypress-file-upload": "^5.0.8",
     "cypress-real-events": "^1.14.0",
+    "esbuild": "^0.28.2",
     "eslint": "8.57.1",
     "eslint-config-next": "15.5.27",
     "typescript": "^5.8.3"
