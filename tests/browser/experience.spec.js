@@ -205,3 +205,25 @@ test("Korean password flow downloads the original plaintext after decryption", a
   expect(await fs.readFile(await decryptedFile.path())).toEqual(sample.buffer);
   await expect(decryptPanel.getByRole("heading", { name: "파일을 복호화하고 검증했어요", exact: true })).toBeVisible();
 });
+
+for (const locale of [
+  { code: "en_US", weak: "Password strength: Very Weak (guessable)", strong: "Password strength: Strong" },
+  { code: "ko_KR", weak: "비밀번호 강도: 매우 약해요", strong: "비밀번호 강도: 강해요" },
+]) {
+  test("password strength recognizes weak patterns and strong passwords in " + locale.code, async ({ page }) => {
+    const errors = [];
+    page.on("pageerror", error => errors.push(error.message));
+    await page.addInitScript(code => localStorage.setItem("language", code), locale.code);
+    await page.goto("/");
+    await page.locator("#enc-file").setInputFiles(sample);
+    await page.getByRole("button", { name: locale.code === "ko_KR" ? "비밀번호 설정하기" : "Set a password", exact: true }).click();
+    const input = page.locator("#encrypt-password");
+    for (const password of ["password", "qwertyuiop"]) {
+      await input.fill(password);
+      await expect(page.getByText(locale.weak, { exact: true })).toBeVisible();
+    }
+    await input.fill("j7!Qm2@Vp9#Lx4$Rt8");
+    await expect(page.getByText(locale.strong, { exact: true })).toBeVisible();
+    expect(errors).toEqual([]);
+  });
+}
