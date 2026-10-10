@@ -6,7 +6,7 @@ import { getTranslations as t } from "../../../locales";
 import { generatePassword, generatePassPhrase } from "../../utils/generatePassword";
 import { computePublicKey } from "../../utils/computePublicKey";
 import { downloadBlob } from "../../utils/downloadBlob";
-const _sodium = require("libsodium-wrappers");
+const _sodium = require("libsodium-wrappers-sumo");
 import { MAX_FILE_SIZE, SIGNATURES, CHUNK_SIZE, encoder } from "../../config/Constants";
 
 let file,

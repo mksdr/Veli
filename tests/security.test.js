@@ -1,6 +1,7 @@
 const { test, before } = require("node:test");
 const assert = require("node:assert/strict");
-const sodium = require("libsodium-wrappers");
+const sodium = require("libsodium-wrappers-sumo");
+const { encryptLegacy, decryptLegacy, chunkSize } = require("./helpers/legacyCrypto");
 const { pullChunk } = require("../src/utils/secretstream");
 const { decryptFile } = require("../src/utils/decryptFile");
 const { installWorker } = require("../service-worker/worker");
@@ -12,6 +13,68 @@ const config = {
   sigCodes: { v1: "Encrypted Using Hat.sh", v2_symmetric: "zDKO6XYXioc", v2_asymmetric: "hTWKbfoikeg" },
 };
 before(async () => { await sodium.ready; });
+
+test("retains the Argon2id parameters and file constants used by existing files", () => {
+  assert.equal(sodium.crypto_pwhash_OPSLIMIT_INTERACTIVE, 2);
+  assert.equal(sodium.crypto_pwhash_MEMLIMIT_INTERACTIVE, 67108864);
+  assert.equal(sodium.crypto_pwhash_ALG_ARGON2ID13, 2);
+  assert.equal(sodium.crypto_pwhash_SALTBYTES, 16);
+  assert.equal(sodium.crypto_secretstream_xchacha20poly1305_KEYBYTES, 32);
+  assert.equal(sodium.crypto_secretstream_xchacha20poly1305_HEADERBYTES, 24);
+  assert.equal(sodium.crypto_secretstream_xchacha20poly1305_ABYTES, 17);
+});
+
+for (const mode of ["password", "public-key"]) {
+  test(`${mode} worker files are compatible with 0.7.10 in both directions`, async () => {
+    const password = "Legacy-password-한글-123!";
+    const keys = mode === "public-key" ? { sender: sodium.crypto_kx_keypair(), receiver: sodium.crypto_kx_keypair() } : null;
+    const cases = [Buffer.alloc(0), Buffer.from("Legacy file: 한글 🔐")];
+    if (!keys) {
+      const boundary = Buffer.alloc(chunkSize + 1);
+      boundary[0] = 7;
+      boundary[chunkSize - 1] = 9;
+      boundary[chunkSize] = 11;
+      cases.push(boundary);
+    }
+    for (const plaintext of cases) {
+      const h = harness(), client = h.client("compatibility");
+      const enc = await h.prepare(client);
+      await h.send(client, keys ? {
+        cmd: "requestEncKeyPair", privateKey: sodium.to_base64(keys.sender.privateKey),
+        publicKey: sodium.to_base64(keys.receiver.publicKey), operationId: enc.operationId,
+      } : { cmd: "requestEncryption", password, operationId: enc.operationId });
+      assert.equal(client.messages.at(-1).reply, keys ? "keyPairReady" : "keysGenerated");
+      const encryptedBody = h.fetch(enc.downloadUrl).arrayBuffer();
+      for (let offset = 0; offset < plaintext.length || offset === 0; offset += chunkSize) {
+        const end = Math.min(offset + chunkSize, plaintext.length);
+        await h.send(client, {
+          cmd: offset === 0 ? keys ? "asymmetricEncryptFirstChunk" : "encryptFirstChunk" : "encryptRestOfChunks",
+          chunk: plaintext.subarray(offset, end), last: end === plaintext.length, operationId: enc.operationId,
+        });
+      }
+      assert.deepEqual(await decryptLegacy(new Uint8Array(await encryptedBody), password, keys), plaintext);
+
+      const legacy = await encryptLegacy(plaintext, password, keys);
+      const dec = await h.prepare(client, "Dec");
+      const start = keys ? 35 : 51;
+      await h.send(client, {
+        ...(keys ? { cmd: "requestDecKeyPair", privateKey: sodium.to_base64(keys.receiver.privateKey),
+          publicKey: sodium.to_base64(keys.sender.publicKey) }
+          : { cmd: "requestDecryption", password, salt: legacy.subarray(11, 27), signature: legacy.subarray(0, 11) }),
+        header: legacy.subarray(start - 24, start), operationId: dec.operationId,
+      });
+      assert.equal(client.messages.at(-1).reply, keys ? "decKeyPairGenerated" : "decKeysGenerated");
+      const decryptedBody = h.fetch(dec.downloadUrl).arrayBuffer();
+      for (let offset = start; offset < legacy.length; offset += chunkSize + 17) {
+        const end = Math.min(offset + chunkSize + 17, legacy.length);
+        await h.send(client, { cmd: offset === start ? "decryptFirstChunk" : "decryptRestOfChunks",
+          chunk: legacy.subarray(offset, end), last: end === legacy.length, operationId: dec.operationId });
+      }
+      assert.deepEqual(Buffer.from(await decryptedBody), plaintext);
+      assert.equal(client.messages.at(-1).reply, "decryptionFinished");
+    }
+  });
+}
 
 function fixture(messages, tags) {
   const key = sodium.crypto_secretstream_xchacha20poly1305_keygen();

@@ -1,4 +1,4 @@
-const _sodium = require("libsodium-wrappers");
+const _sodium = require("libsodium-wrappers-sumo");
 
 export const generateAsymmetricKeys = async () => {
   await _sodium.ready;

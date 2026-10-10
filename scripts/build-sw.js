@@ -1,7 +1,7 @@
 const esbuild = require("esbuild");
 const path = require("path");
 
-// Stub Node.js built-in modules required by libsodium / libsodium-wrappers in browser/SW environments
+// Stub Node.js built-in modules required by libsodium / libsodium-wrappers-sumo in browser/SW environments
 const emptyNodeModulesPlugin = {
   name: "empty-node-modules",
   setup(build) {
