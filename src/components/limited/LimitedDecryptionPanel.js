@@ -4,7 +4,7 @@ import { useDropzone } from "react-dropzone";
 import FileWorkflow from "../FileWorkflow";
 import { getTranslations as t } from "../../../locales";
 import { downloadBlob } from "../../utils/downloadBlob";
-const _sodium = require("libsodium-wrappers");
+const _sodium = require("libsodium-wrappers-sumo");
 import { decryptFile } from "../../utils/decryptFile";
 import { formatName } from "../../helpers/formatName";
 import { MAX_FILE_SIZE, SIGNATURES, CHUNK_SIZE, decoder } from "../../config/Constants";

@@ -1,6 +1,7 @@
 const { test, expect } = require("@playwright/test");
 const fs = require("node:fs/promises");
-const sodium = require("libsodium-wrappers");
+const sodium = require("libsodium-wrappers-sumo");
+const { encryptLegacy, decryptLegacy } = require("../helpers/legacyCrypto");
 const password = "Browser-test-password-123!";
 const plaintext = Buffer.from("Veli browser round trip: 한글 🔐\n");
 
@@ -70,6 +71,7 @@ for (const path of ["/", "/headless/"]) {
     page.on("pageerror", error => errors.push(error.message));
     const encrypted = await encrypt(page, path);
     expect(encrypted.subarray(0, 11).toString()).toBe("zDKO6XYXioc");
+    expect(await decryptLegacy(encrypted, password)).toEqual(plaintext);
     // The browser can receive the complete download before React handles the
     // worker's completion message. Wait before intentionally leaving the page.
     await expect(page.getByRole("heading", { name: "Your files are encrypted", exact: true })).toBeVisible();
@@ -136,6 +138,7 @@ test("public-key file round trip", async ({ page }) => {
     publicKey: sodium.to_base64(receiver.publicKey), privateKey: sodium.to_base64(sender.privateKey),
   });
   expect(encrypted.subarray(0, 11).toString()).toBe("hTWKbfoikeg");
+  expect(await decryptLegacy(encrypted, password, { sender, receiver })).toEqual(plaintext);
   const panel = await decrypt(page, encrypted, "/", {
     publicKey: sodium.to_base64(sender.publicKey), privateKey: sodium.to_base64(receiver.privateKey),
   });
@@ -145,6 +148,22 @@ test("public-key file round trip", async ({ page }) => {
   else await panel.getByRole("button", { name: "Download decrypted file", exact: true }).click();
   expect(await contents(await download)).toEqual(plaintext);
 });
+
+for (const mode of ["password", "public-key"]) {
+  test(`decrypts a legacy 0.7.10 ${mode} file`, async ({ page }) => {
+    await sodium.ready;
+    const keys = mode === "public-key" ? { sender: sodium.crypto_kx_keypair(), receiver: sodium.crypto_kx_keypair() } : null;
+    const encrypted = await encryptLegacy(plaintext, password, keys);
+    const panel = await decrypt(page, encrypted, "/", keys ? {
+      publicKey: sodium.to_base64(keys.sender.publicKey), privateKey: sodium.to_base64(keys.receiver.privateKey),
+    } : undefined);
+    const download = page.waitForEvent("download");
+    const streamButton = panel.getByRole("button", { name: "Decrypt & download", exact: true });
+    if (await streamButton.isVisible()) await streamButton.click();
+    else await panel.getByRole("button", { name: "Download decrypted file", exact: true }).click();
+    expect(await contents(await download)).toEqual(plaintext);
+  });
+}
 
 test("malformed short encrypted file releases busy state", async ({ page }) => {
   await page.goto("/?tab=decryption");
