@@ -17,7 +17,7 @@
     "@emotion/react": "^11.14.0",
     "@emotion/styled": "^11.14.1",
     "@mui/icons-material": "^5.17.1",
-    "@mui/material": "^5.17.1",
+    "@mui/material": "^9.4.0",
     "@mui/styles": "^5.17.1",
     "@zxcvbn-ts/core": "^3.0.4",
     "@zxcvbn-ts/language-common": "^4.1.3",
