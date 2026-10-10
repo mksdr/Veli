@@ -1,5 +1,12 @@
 # [CHANGELOG](#changelog)
 
+## v3.2.3 (2026-10-10)
+
+- Require dependency audit, security tests, static build, and browser regression tests to pass before Docker Hub publishing.
+- Ignore environment files and private key files while keeping `.env.example` trackable.
+
+---
+
 ## v3.2.2 (2026-10-10)
 
 - Add Docker Hub publishing workflow and container deployment documentation.

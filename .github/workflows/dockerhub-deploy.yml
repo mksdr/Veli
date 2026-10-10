@@ -16,7 +16,12 @@ env:
   IMAGE_NAME: mksdr/veli
 
 jobs:
+  regression:
+    if: github.repository == 'mksdr/Veli' && (github.event_name == 'push' || github.ref == 'refs/heads/master')
+    uses: ./.github/workflows/security-browser-tests.yml
+
   publish:
+    needs: regression
     if: github.repository == 'mksdr/Veli' && (github.event_name == 'push' || github.ref == 'refs/heads/master')
     runs-on: ubuntu-latest
     timeout-minutes: 30
