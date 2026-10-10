@@ -20,6 +20,8 @@ jobs:
       - run: npm ci
         env:
           CYPRESS_INSTALL_BINARY: 0
+      - name: Audit production dependencies
+        run: npm audit --omit=dev --audit-level=high
       - run: npm run test:security
       - run: npm run build
       - run: npx playwright install --with-deps chromium firefox webkit
