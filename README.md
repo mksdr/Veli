@@ -92,6 +92,63 @@ docker run --rm -p 3991:80 veli:local
 
 Alternatively, run `docker compose up --build`. Both build the current source.
 
+### Docker Hub
+
+The Docker Hub repository is [`mksdr/veli`](https://hub.docker.com/r/mksdr/veli).
+After an image has been published, run it with:
+
+```sh
+docker run --rm -p 3991:80 mksdr/veli:3.2.1
+```
+
+Open `http://localhost:3991`. The container listens on port 80; the host port
+can be changed as needed.
+
+#### Publish with GitHub Actions
+
+The [Publish to Docker Hub workflow](.github/workflows/dockerhub-deploy.yml)
+builds Linux AMD64 and ARM64 images and publishes the package version (currently
+`3.2.1`) and `latest` to `mksdr/veli`. It first runs an AMD64 container and checks
+the main pages and service worker over HTTP.
+
+1. In Docker Home, open **Account settings → Personal access tokens** and create
+   a token for the `mksdr` account with **Read & Write** permissions.
+2. In the [GitHub repository's Actions secrets settings](https://github.com/mksdr/Veli/settings/secrets/actions),
+   select **New repository secret**. Use `DOCKERHUB_TOKEN` as the name and the
+   Docker Hub token as its value.
+3. Commit and push the Docker configuration and workflow to `master`.
+4. Open [GitHub Actions](https://github.com/mksdr/Veli/actions), select
+   **Publish to Docker Hub**, then **Run workflow** on `master`.
+5. Once the workflow succeeds, check the tags in
+   [Docker Hub](https://hub.docker.com/r/mksdr/veli/tags).
+
+Later releases can also be published by pushing a Git tag such as `v3.2.1`.
+The tag must exactly match `v` followed by the version in `package.json`.
+Only stable `x.y.z` versions are accepted. Manual publishing is restricted to
+`master` in `mksdr/Veli`; each successful publication updates `latest`.
+The existing GHCR workflow publishes separately.
+
+#### Publish from a local Docker installation
+
+To build and publish version 3.2.1 from the project directory:
+
+```sh
+docker login --username mksdr
+docker build --pull -t mksdr/veli:3.2.1 -t mksdr/veli:latest .
+docker run --rm -p 3991:80 mksdr/veli:3.2.1
+```
+
+Check the app at `http://localhost:3991`, then stop the container with Ctrl+C
+and upload both tags:
+
+```sh
+docker push mksdr/veli:3.2.1
+docker push mksdr/veli:latest
+```
+
+Enter the Docker Hub personal access token at the login prompt. Do not add it
+to project files. Update the version tag for each new release.
+
 ## Browser compatibility
 
 Desktop browsers can stream file processing and downloads. Safari, mobile

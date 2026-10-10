@@ -1,4 +1,5 @@
-FROM node:22-alpine as builder
+# Static output is independent of the runtime CPU architecture.
+FROM --platform=$BUILDPLATFORM node:22-alpine AS builder
 
 WORKDIR /app
 
@@ -8,7 +9,7 @@ RUN npm ci
 
 COPY . ./
 
-ENV NEXT_TELEMETRY_DISABLED 1
+ENV NEXT_TELEMETRY_DISABLED=1
 
 RUN npm run build
 
@@ -17,6 +18,6 @@ FROM nginx:stable-alpine
 
 COPY --from=builder /app/out /usr/share/nginx/html
 
-EXPOSE 3991
+EXPOSE 80
 
 ENTRYPOINT ["nginx", "-g", "daemon off;"]
