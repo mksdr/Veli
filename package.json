@@ -40,7 +40,7 @@
     "eslint": "8.57.1",
     "eslint-config-next": "15.5.27",
     "libsodium-wrappers": "0.7.10",
-    "typescript": "^5.8.3"
+    "typescript": "^7.0.2"
   },
   "overrides": {
     "next": {
