@@ -5,6 +5,7 @@ import FileWorkflow from "./FileWorkflow";
 import { getTranslations as t } from "../../locales";
 import { formatName } from "../helpers/formatName";
 import { CHUNK_SIZE, crypto_secretstream_xchacha20poly1305_ABYTES } from "../config/Constants";
+import { downloadStream } from "../utils/downloadStream";
 
 let file,
   index,
@@ -17,10 +18,12 @@ let file,
   privateKey,
   publicKey;
 
-let operationId, downloadUrl, nextFileTimer, pendingRequestId;
+let operationId, downloadUrl, nextFileTimer, pendingRequestId, releaseDownload;
 const postToWorker = (worker, data, transfer = []) =>
   worker.postMessage({ ...data, operationId }, transfer);
 const cancelOperation = () => {
+  releaseDownload?.();
+  releaseDownload = null;
   pendingRequestId = null;
   clearTimeout(nextFileTimer);
   if (operationId && navigator.serviceWorker.controller) {
@@ -358,7 +361,8 @@ export default function DecryptionPanel({ active = true }) {
     const currentOperation = operationId;
     if (currFile <= numberOfFiles - 1) {
       file = files[currFile];
-      window.open(downloadUrl, "_self");
+      releaseDownload?.();
+      releaseDownload = downloadStream(downloadUrl);
       setIsDownloading(true);
 
       if (decryptionMethodState === "secretKey") {

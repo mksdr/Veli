@@ -60,18 +60,64 @@ async function decrypt(page, encrypted, path = "/", keys, navigate = true) {
 for (const path of ["/", "/headless/"]) {
   test("password file round trip at " + path, async ({ page }) => {
     const errors = [];
+    const dialogs = [];
+    // Reproduce a user cancelling any unexpected leave-site prompt. Downloads
+    // must complete without prompting, in both streaming directions.
+    page.on("dialog", async dialog => {
+      dialogs.push(dialog.type());
+      await dialog.dismiss();
+    });
     page.on("pageerror", error => errors.push(error.message));
     const encrypted = await encrypt(page, path);
     expect(encrypted.subarray(0, 11).toString()).toBe("zDKO6XYXioc");
+    // The browser can receive the complete download before React handles the
+    // worker's completion message. Wait before intentionally leaving the page.
+    await expect(page.getByRole("heading", { name: "Your files are encrypted", exact: true })).toBeVisible();
     const panel = await decrypt(page, encrypted, path);
     const download = page.waitForEvent("download");
     const streamButton = panel.getByRole("button", { name: "Decrypt & download", exact: true });
     if (await streamButton.isVisible()) await streamButton.click();
     else await panel.getByRole("button", { name: "Download decrypted file", exact: true }).click();
     expect(await contents(await download)).toEqual(plaintext);
+    expect(dialogs).toEqual([]);
+    expect(new URL(page.url()).pathname).toBe(path);
+    expect(new URL(page.url()).search).toBe("?tab=decryption");
     expect(errors).toEqual([]);
   });
 }
+
+test("cancelling a real page exit keeps streaming encryption alive", async ({ page, browserName }) => {
+  test.skip(browserName !== "chromium", "Exercise the streaming page-exit guard in Chromium");
+  await page.addInitScript(() => {
+    const post = ServiceWorker.prototype.postMessage;
+    ServiceWorker.prototype.postMessage = function (data, ...args) {
+      if (data.cmd === "requestEncryption") {
+        window.resumeEncryption = () => post.call(this, data, ...args);
+        return;
+      }
+      return post.call(this, data, ...args);
+    };
+  });
+  await page.goto("/");
+  await page.locator("#enc-file").setInputFiles({ name: "exit-test.txt", mimeType: "text/plain", buffer: plaintext });
+  const panel = page.locator("#simple-tabpanel-0");
+  await panel.getByRole("button", { name: "Set a password", exact: true }).click();
+  await panel.locator('input[type="password"]').fill(password);
+  await panel.getByRole("button", { name: "Review encryption", exact: true }).click();
+  const download = page.waitForEvent("download");
+  await panel.getByRole("button", { name: "Encrypt & download", exact: true }).click();
+  await page.waitForFunction(() => !!window.resumeEncryption);
+  await expect(page.getByRole("tab", { name: "Decrypt files", exact: true })).toBeDisabled();
+  const dialog = page.waitForEvent("dialog");
+  const leave = page.evaluate(() => window.location.assign("/about/"));
+  const prompt = await dialog;
+  expect(prompt.type()).toBe("beforeunload");
+  await prompt.dismiss();
+  await leave;
+  await page.evaluate(() => window.resumeEncryption());
+  expect((await contents(await download)).subarray(0, 11).toString()).toBe("zDKO6XYXioc");
+  await expect(page.getByRole("heading", { name: "Your files are encrypted", exact: true })).toBeVisible();
+});
 
 test("blocked storage still loads and encrypts", async ({ page }) => {
   await page.addInitScript(() => Object.defineProperty(window, "localStorage", {
