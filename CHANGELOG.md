@@ -1,5 +1,18 @@
 # [CHANGELOG](#changelog)
 
+## v3.1.0 (2026-10-10)
+
+- Rebrand Hatsmith as Veli with a new logo, favicons, and updated project documentation, while retaining upstream credits.
+- Simplify encryption and decryption into guided file, credential, and save steps, with public-key tools available as advanced options.
+- Add Korean interface and help alongside English, with updated light/dark themes, keyboard focus, and mobile layouts.
+- Improve password generation, private-key backup, clipboard fallback, draft preservation, and cancellation feedback.
+- Reject truncated or malformed ciphertext by requiring the authenticated final secretstream tag, while preserving the hat.sh v2 file format.
+- Isolate concurrent service-worker jobs and improve download startup, backpressure, cancellation, and error handling.
+- Improve Safari/mobile buffered processing, release download resources, limit file-information hashes to 32 MiB, and handle unavailable browser storage or workers.
+- Update Next.js and PostCSS, require Node.js 22 or newer, and add security and cross-browser regression tests and CI.
+
+---
+
 ## v3.0.0
 
 - Add file info dialog

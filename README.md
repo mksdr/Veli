@@ -8,6 +8,8 @@
 
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 
+Current version: **v3.1.0**. See the [changelog](CHANGELOG.md) for release details.
+
 Veli is a web app for local file encryption and decryption. Files are processed
 in your browser rather than uploaded to a server. Its interface guides you
 through choosing files, entering a password or keys, and saving the result.
@@ -149,4 +151,5 @@ sources are retained for future expansion.
 ## License
 
 Veli is licensed under the [MIT License](LICENSE). Original copyright notices
-for sh-dv and contributors and mrtechtroid remain in the license.
+for sh-dv and contributors and mrtechtroid remain in the license, alongside
+the copyright notice for Veli contributions by mksdr.
