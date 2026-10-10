@@ -1,6 +1,6 @@
 /// <reference types="cypress" />
 /* eslint-disable no-console */
-const { rmdir } = require("fs");
+const { rm } = require("fs");
 
 /**
  * @type {Cypress.PluginConfig}
@@ -11,7 +11,7 @@ module.exports = (on, config) => {
       console.log("deleting folder %s", folderName);
 
       return new Promise((resolve, reject) => {
-        rmdir(folderName, { maxRetries: 10, recursive: true }, (err) => {
+        rm(folderName, { maxRetries: 10, recursive: true, force: true }, (err) => {
           if (err) {
             console.error(err);
 
