@@ -136,14 +136,26 @@ test("narrow layouts and dark mode keep the workflow usable", async ({ page }) =
 
 test("stalled streaming can be cancelled without allowing tab or language changes", async ({ page, browserName }) => {
   test.skip(browserName !== "chromium", "Controlled service-worker streaming check");
+  await page.addInitScript(() => {
+    const post = ServiceWorker.prototype.postMessage;
+    ServiceWorker.prototype.postMessage = function (data, ...args) {
+      // Hold encryption at the worker boundary so the processing state stays
+      // active regardless of how the download is opened (currently an iframe).
+      if (data.cmd === "requestEncryption") {
+        window.encryptionStalled = true;
+        return;
+      }
+      return post.call(this, data, ...args);
+    };
+  });
   await choose(page);
   if (await page.getByText("This browser processes one file at a time, up to 1 GiB. Available memory may require a smaller file.", { exact: true }).isVisible()) {
     test.skip(true, "Streaming is unavailable in this context");
   }
   await page.getByLabel(/^Password\s*\*?$/).fill("Sample-password-123!");
   await page.getByRole("button", { name: "Review encryption", exact: true }).click();
-  await page.evaluate(() => { window.open = () => null; });
   await page.getByRole("button", { name: "Encrypt & download", exact: true }).click();
+  await page.waitForFunction(() => window.encryptionStalled === true);
   await expect(page.getByRole("tab", { name: "Decrypt files", exact: true })).toBeDisabled();
   await page.getByRole("button", { name: "Settings", exact: true }).click();
   await expect(page.getByRole("combobox", { name: "Language", exact: true })).toBeDisabled();
