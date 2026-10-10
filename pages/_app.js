@@ -5,9 +5,6 @@ import "../public/assets/styles/style.css";
 import { AppearanceProvider } from "../src/config/Theme";
 import { LocaleProvider, useLocale } from "../locales";
 import { WorkflowProvider } from "../src/components/WorkflowContext";
-// import { makeStyles, useTheme } from "@mui/styles";
-//check wether the user prefers/chose dark theme
-
 
 function AppContent({ Component, pageProps }) {
   const { locale } = useLocale();

@@ -1,5 +1,3 @@
-// import { ThemeProvider } from "@mui/styles";
-// import { Theme } from "../src/config/Theme";
 import NavAppBar from "../src/components/AppBar";
 import Footer from "../src/components/Footer";
 import Hero from "../src/components/Hero";
@@ -19,23 +17,19 @@ const useStyles = makeStyles((theme) => ({
 const Generate = () => {
   const classes = useStyles();
   return (
-    // <ThemeProvider theme={Theme}>
-      <div
-        className={classes.page}
+    <div className={classes.page}>
+      <NavAppBar />
+      <Hero />
+      <Container
+        style={{
+          maxWidth: "768px",
+        }}
       >
-        <NavAppBar />
-        <Hero />
-        <Container
-          style={{
-            maxWidth: "768px",
-          }}
-        >
-          <KeyPairGeneration opened={true} />
-        </Container>
+        <KeyPairGeneration opened={true} />
+      </Container>
 
-        <Footer />
-      </div>
-    // </ThemeProvider>
+      <Footer />
+    </div>
   );
 };
 

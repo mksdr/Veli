@@ -330,7 +330,6 @@ export default function About(props) {
 
         <Footer />
       </div>
-    // </ThemeProvider>
   );
 }
 
