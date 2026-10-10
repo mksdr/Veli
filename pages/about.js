@@ -126,18 +126,20 @@ const useStyles = makeStyles((theme) => ({
       color: theme.palette.custom.mineShaft.main,
     },
 
+    "& :not(pre) > code": {
+      backgroundColor: theme.palette.custom.gallery.main,
+      color: theme.palette.text.primary,
+      wordWrap: "break-word",
+      fontFamily: "inherit",
+      paddingRight: 7,
+      paddingLeft: 7,
+      borderRadius: "3px",
+    },
+
     "& p": {
       fontSize: "17px",
       color: theme.palette.custom.mineShaft.main,
       lineHeight: 2,
-      "& code": {
-        backgroundColor: "#f1f1f1",
-        wordWrap: "break-word",
-        fontFamily: "inherit",
-        paddingRight: 7,
-        paddingLeft: 7,
-        borderRadius: "3px",
-      },
     },
 
     "& li": {
@@ -163,32 +165,19 @@ const useStyles = makeStyles((theme) => ({
       paddingLeft: 25,
       paddingBottom: 15,
       fontSize: "16px",
-      "& code": {
-        backgroundColor: "#f1f1f1",
-        wordWrap: "break-word",
-        fontFamily: "inherit",
-        paddingRight: 7,
-        paddingLeft: 7,
-        borderRadius: "3px",
-      },
     },
 
     "& ol": {
       paddingLeft: 25,
       paddingBottom: 15,
       fontSize: "16px",
-      "& code": {
-        backgroundColor: "#f1f1f1",
-        wordWrap: "break-word",
-        fontFamily: "inherit",
-        paddingRight: 7,
-        paddingLeft: 7,
-        borderRadius: "3px",
-      },
     },
 
     "& pre": {
-      background: "rgb(235, 235, 235)",
+      // Match the global Prism Nord token palette in both appearance modes.
+      background: "#2E3440",
+      color: "#f8f8f2",
+      fontFamily: '"Fira Code", Consolas, Monaco, monospace',
       padding: "13px",
       marginTop: "-5px",
       marginBottom: "20px",
@@ -197,16 +186,15 @@ const useStyles = makeStyles((theme) => ({
       borderRadius: "3px",
       overflow: "auto",
       "& code": {
-        color: theme.palette.custom.mineShaft.main,
+        color: "inherit",
+        background: "none",
+        fontFamily: "inherit",
       },
-    },
-
-    "& .codeBox": {
-      "& pre": {
-        background: "#2E3440",
-        "& code": {
-          color: "#f8f8f2",
-        },
+      "& .token.comment, & .token.prolog, & .token.doctype, & .token.cdata": {
+        color: "#aebbc9",
+      },
+      "& .token.number": {
+        color: "#c6a0bf",
       },
     },
 

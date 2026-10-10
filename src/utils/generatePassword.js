@@ -1,4 +1,4 @@
-const _sodium = require("libsodium-wrappers");
+const _sodium = require("libsodium-wrappers-sumo");
 const dicewareWordlist = require("../helpers/eef_word_list.json");
 export const generatePassword = async () => {
   await _sodium.ready;

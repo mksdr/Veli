@@ -1,4 +1,4 @@
-const _sodium = require("libsodium-wrappers");
+const _sodium = require("libsodium-wrappers-sumo");
 
 //compute publickey from a given privatekey
 export const computePublicKey = async (privateKey) => {

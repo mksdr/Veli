@@ -1,3 +1,3 @@
 const { installWorker } = require("./worker");
 
-installWorker(self, require("libsodium-wrappers"), require("./config"));
+installWorker(self, require("libsodium-wrappers-sumo"), require("./config"));
