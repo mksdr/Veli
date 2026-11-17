@@ -1,0 +1,89 @@
+name: Release
+
+on:
+  push:
+    branches: [master]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release-please
+  cancel-in-progress: false
+
+jobs:
+  release:
+    if: github.repository == 'mksdr/Veli' && github.ref == 'refs/heads/master'
+    runs-on: ubuntu-latest
+    outputs:
+      created: ${{ steps.release.outputs.release_created }}
+      tag: ${{ steps.release.outputs.tag_name }}
+    steps:
+      - name: Create release App token
+        id: app
+        uses: actions/create-github-app-token@fee1f7d63c2ff003460e3d139729b119787bc349 # v2
+        with:
+          app-id: ${{ vars.RELEASE_APP_ID }}
+          private-key: ${{ secrets.RELEASE_APP_PRIVATE_KEY }}
+          permission-contents: write
+          permission-pull-requests: write
+          permission-issues: write
+      - name: Update release PR or publish merged release
+        id: release
+        uses: googleapis/release-please-action@8b8fd2cc23b2e18957157a9d923d75aa0c6f6ad5 # v4
+        with:
+          token: ${{ steps.app.outputs.token }}
+          target-branch: master
+          config-file: release-please-config.json
+          manifest-file: .release-please-manifest.json
+
+      - name: Checkout trusted release tooling
+        if: steps.release.outputs.pr != ''
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+      - name: Keep release changelog headings free of dates
+        if: steps.release.outputs.pr != ''
+        uses: actions/github-script@ed597411d8f924073f98dfc5c65a23a2325f34cd # v8
+        env:
+          RELEASE_PR: ${{ steps.release.outputs.pr }}
+        with:
+          github-token: ${{ steps.app.outputs.token }}
+          script: |
+            const { normalizeChangelog } = require('./scripts/release-policy.cjs');
+            const { number } = JSON.parse(process.env.RELEASE_PR);
+            const { data: pr } = await github.rest.pulls.get({ ...context.repo, pull_number: number });
+            if (pr.state !== 'open' || pr.base.ref !== 'master' ||
+                pr.head.repo.full_name !== `${context.repo.owner}/${context.repo.repo}`) {
+              throw new Error('Expected an open release PR in this repository targeting master');
+            }
+            const { data: file } = await github.rest.repos.getContent({
+              ...context.repo, path: 'CHANGELOG.md', ref: pr.head.sha
+            });
+            if (file.type !== 'file' || file.encoding !== 'base64') {
+              throw new Error('Expected a UTF-8 changelog file');
+            }
+            const content = Buffer.from(file.content, 'base64').toString('utf8');
+            const formatted = normalizeChangelog(content);
+            if (formatted === content) return;
+            await github.rest.repos.createOrUpdateFileContents({
+              ...context.repo, path: 'CHANGELOG.md', branch: pr.head.ref,
+              sha: file.sha, content: Buffer.from(formatted).toString('base64'),
+              message: 'chore(docs): format release changelog without dates'
+            });
+
+  containers:
+    needs: release
+    if: needs.release.outputs.created == 'true'
+    permissions:
+      contents: read
+      packages: write
+      attestations: write
+      id-token: write
+    uses: ./.github/workflows/publish-containers.yml
+    with:
+      tag: ${{ needs.release.outputs.tag }}
+    secrets:
+      DOCKERHUB_TOKEN: ${{ secrets.DOCKERHUB_TOKEN }}
