@@ -1,6 +1,6 @@
 # [CHANGELOG](#changelog)
 
-## [3.2.4](https://github.com/mksdr/Veli/compare/v3.2.3...v3.2.4) (2026-11-17)
+## v3.2.4
 
 
 ### Bug Fixes
