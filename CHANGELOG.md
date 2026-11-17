@@ -1,5 +1,12 @@
 # [CHANGELOG](#changelog)
 
+## [3.2.4](https://github.com/mksdr/Veli/compare/v3.2.3...v3.2.4) (2026-11-17)
+
+
+### Bug Fixes
+
+* **ci:** introduce conventional commits and versioned releases ([#45](https://github.com/mksdr/Veli/issues/45)) ([426fe09](https://github.com/mksdr/Veli/commit/426fe090ee58f90554d5a249608c14c4fa11f595))
+
 ## v3.2.3
 
 - Require dependency audit, security tests, static build, and browser regression tests to pass before Docker Hub publishing.
