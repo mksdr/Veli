@@ -99,9 +99,9 @@ jobs:
           fs.appendFileSync(process.env.GITHUB_OUTPUT, `version=${version}\n`);
           NODE
       - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v4
+        uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4
       - name: Log in to registry
-        uses: docker/login-action@v4
+        uses: docker/login-action@8aa5831fb8d48d8f76594c7ddde61ae58019f550 # v4
         with:
           registry: ${{ matrix.registry }}
           username: mksdr
@@ -132,7 +132,7 @@ jobs:
           fi
       - name: Build image for smoke test
         if: steps.existing.outputs.exists != 'true'
-        uses: docker/build-push-action@v7
+        uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7
         with:
           context: .
           platforms: linux/amd64
@@ -156,7 +156,7 @@ jobs:
       - name: Publish immutable AMD64 and ARM64 version
         id: push
         if: steps.existing.outputs.exists != 'true'
-        uses: docker/build-push-action@v7
+        uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7
         with:
           context: .
           platforms: linux/amd64,linux/arm64
@@ -172,7 +172,7 @@ jobs:
           cache-to: type=gha,scope=veli-${{ matrix.registry }},mode=max
       - name: Attest GHCR image (including retries)
         if: matrix.registry == 'ghcr.io'
-        uses: actions/attest-build-provenance@v4
+        uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8 # v4
         with:
           subject-name: ${{ matrix.image }}
           subject-digest: ${{ steps.push.outputs.digest || steps.existing.outputs.digest }}

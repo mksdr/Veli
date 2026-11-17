@@ -97,7 +97,8 @@ Alternatively, run `docker compose up --build`. Both build the current source.
 Stable releases publish AMD64 and ARM64 images to
 [`mksdr/veli`](https://hub.docker.com/r/mksdr/veli) and
 [`ghcr.io/mksdr/veli`](https://github.com/mksdr/Veli/pkgs/container/veli).
-To run the version checked out in your project directory:
+Once the version in your checkout has been published successfully to the chosen
+registry, run it with:
 
 ```sh
 veli_version=$(node -p "require('./package.json').version")
@@ -105,8 +106,13 @@ docker run --rm -p 3991:80 "mksdr/veli:$veli_version"
 # Or use "ghcr.io/mksdr/veli:$veli_version".
 ```
 
+A Release Please PR updates `package.json` before its image is published. For
+that checkout, use the local build instructions above, or select a version
+already available in the registry. Merging the PR starts publishing; wait for
+the registry's publish job to succeed before using the new version tag.
+
 The container listens on port 80. Each registry also provides `latest` for the
-newest stable release; use a version tag for reproducible deployments.
+newest stable release; use a published version tag for reproducible deployments.
 
 Release Please opens a PR with the next SemVer version and changelog. Merging
 that PR creates a `vX.Y.Z` tag and GitHub Release, then runs the dependency audit,
