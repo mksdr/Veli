@@ -8,8 +8,6 @@
 
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 
-Current version: **v3.2.3**. See the [changelog](CHANGELOG.md) for release details.
-
 Veli is a web app for local file encryption and decryption. Files are processed
 in your browser rather than uploaded to a server. Its interface guides you
 through choosing files, entering a password or keys, and saving the result.
@@ -176,36 +174,6 @@ The browser suite covers Chromium, Firefox, desktop WebKit, and iPhone/iPad
 WebKit profiles. It compares downloaded plaintext with original bytes and
 rejects incomplete or tampered ciphertext. Device profiles do not replace
 physical iOS Safari testing.
-
-Read the [security and browser review](docs/security-browser-review.md) and the
-[UI/UX implementation record](docs/ui-ux-implementation.md) for validation scope
-and remaining follow-up. Supported translations are described in
-[TRANSLATION.md](TRANSLATION.md); additional languages can be added later.
-
-## Supporting the original project
-
-The upstream donation link is available through
-[hat.sh](https://github.com/sh-dv/hat.sh). This is support for the predecessor
-project, not a Veli payment or donation flow.
-
-## Acknowledgements and Credits
-
-- Everyone who supported the project.
-- [Samuel-lucas6](https://github.com/samuel-lucas6) from the [Kryptor](https://github.com/samuel-lucas6/Kryptor) project for being helpful and doing a lot of beta testing.
-- [stophecom](https://github.com/stophecom) from the [Scrt.link](https://scrt.link/) project for translating to German.
-- [bbouille](https://github.com/bbouille) for translating to French.
-- [qaqland](https://github.com/qaqland) for translating to Chinese.
-- [Ser-Bul](https://github.com/Ser-Bul) for translating to Russian.
-- [matteotardito](https://github.com/matteotardito) for translating to Italian.
-- [t0mzSK](https://github.com/t0mzSK) for translating to Slovak.
-- [Xurdejl](https://github.com/Xurdejl) for translating to Spanish.
-- [Franatrtur](https://github.com/Franatrtur) for translating to Czech.
-- [darkao](https://github.com/darkao) for translating to Turkish.
-- [Frank7sun](https://github.com/Frank7sun) for translating to Japanese.
-
-The translation credits above include contributions inherited from earlier
-projects. Veli currently ships English and Korean only; other translation
-sources are retained for future expansion.
 
 ## License
 
