@@ -118,13 +118,16 @@ export default function EncryptionPanel({ active = true }) {
     cancelOperation();
     setOperationError(false);
     setIsTestingKeys(false);
+    // eslint-disable-next-line react-hooks/globals -- This callback updates legacy processing state on user/worker events, never during render.
     password = null;
     setActiveStep(0);
     setFiles([]);
     setPassword();
     setPublicKey();
     setPrivateKey();
+    // eslint-disable-next-line react-hooks/globals -- This callback updates legacy processing state on user/worker events, never during render.
     privateKey = null;
+    // eslint-disable-next-line react-hooks/globals -- This callback updates legacy processing state on user/worker events, never during render.
     publicKey = null;
     setWrongPublicKey(false);
     setWrongPrivateKey(false);
@@ -133,10 +136,14 @@ export default function EncryptionPanel({ active = true }) {
     setIsDownloading(false);
     setShareableLink();
     setPkAlert(false);
+    // eslint-disable-next-line react-hooks/globals -- This callback updates legacy processing state on user/worker events, never during render.
     file = null;
+    // eslint-disable-next-line react-hooks/globals -- This callback updates legacy processing state on user/worker events, never during render.
     files = [];
+    // eslint-disable-next-line react-hooks/globals -- This callback updates legacy processing state on user/worker events, never during render.
     numberOfFiles = 0;
     resetCurrFile();
+    // eslint-disable-next-line react-hooks/globals -- This callback updates legacy processing state on user/worker events, never during render.
     index = null;
     router.replace(router.pathname);
   };
@@ -224,6 +231,7 @@ export default function EncryptionPanel({ active = true }) {
   const handleEncryptedFilesDownload = async (e) => {
     setIsDownloading(true);
     resetCurrFile();
+    // eslint-disable-next-line react-hooks/globals -- This callback updates legacy processing state on user/worker events, never during render.
     numberOfFiles = Files.length;
     prepareFile();
   };
@@ -343,6 +351,7 @@ export default function EncryptionPanel({ active = true }) {
 
   useEffect(() => {
     if (query.tab === "encryption" && query.publicKey) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- Apply public-key invitations from the router after hydration, preserving editable credential state.
       setPublicKey(query.publicKey);
       publicKey = query.publicKey;
       setPkAlert(true);
