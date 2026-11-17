@@ -41,7 +41,7 @@
     "eslint": "9.39.5",
     "eslint-config-next": "16.4.6",
     "libsodium-wrappers": "0.7.10",
-    "typescript": "^5.9.3"
+    "typescript": "^6.0.3"
   },
   "overrides": {
     "next": {
