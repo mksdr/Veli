@@ -54,12 +54,14 @@ channel. Veli does not transfer files or credentials for you.
 
 ## Development and self-hosting
 
-Use Node.js 22 or newer.
+Use Node.js 26 LTS (26.13.1), as pinned in `.nvmrc`. With nvm installed:
 
 ```sh
 git clone https://github.com/mksdr/Veli.git Veli
 cd Veli
-CYPRESS_INSTALL_BINARY=0 npm ci
+nvm install
+nvm use
+npm ci
 npm run dev
 ```
 
