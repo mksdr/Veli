@@ -12,6 +12,7 @@ export default function Panels({ buffered = false }) {
   const [value, setValue] = useState(0);
   const { busy } = useWorkflow();
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- Synchronize tab state with Next router query changes after hydration and browser navigation.
     setValue(router.query.tab === "decryption" ? 1 : 0);
   }, [router.query.tab]);
   const change = (event, next) => {

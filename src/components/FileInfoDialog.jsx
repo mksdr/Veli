@@ -25,6 +25,7 @@ const FileInfoDialog = ({ file, display, onClose }) => {
 
   useEffect(() => {
     let active = true;
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- Clear stale metadata before starting an asynchronous read of the newly selected browser File.
     setFileInfo(null);
     setError(false);
     if (display && file) {

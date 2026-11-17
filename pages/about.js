@@ -217,11 +217,7 @@ export default function About(props) {
   const theme = useTheme();
   const { locale } = useLocale();
   const [mobileOpen, setMobileOpen] = useState(false);
-  const [docContent, setDocContent] = useState("");
-
-  useEffect(() => {
-    setDocContent((props.docs.find(doc => doc.lang === locale) || props.docs[0]).content);
-  }, [props.docs, locale]);
+  const docContent = (props.docs.find(doc => doc.lang === locale) || props.docs[0]).content;
 
   const handleDrawerToggle = () => {
     setMobileOpen(!mobileOpen);

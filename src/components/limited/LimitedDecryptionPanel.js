@@ -20,7 +20,9 @@ const LimitedDecryptionPanel = ({ active = true }) => {
   useEffect(() => () => { limitedDecFileBuff = null; limitedTestDecFileBuff = null; file = null; decRx = null; decTx = null; }, []);
   const [operationError, setOperationError] = useState(false);
   const handleOperationError = () => {
+    // eslint-disable-next-line react-hooks/globals -- This callback updates legacy processing state on user/worker events, never during render.
     limitedDecFileBuff = null;
+    // eslint-disable-next-line react-hooks/globals -- This callback updates legacy processing state on user/worker events, never during render.
     limitedTestDecFileBuff = null;
     setIsDecrypting(false);
     setIsTestingPassword(false);
@@ -197,6 +199,7 @@ const LimitedDecryptionPanel = ({ active = true }) => {
       );
 
       if (keyFromkeypair) {
+        // eslint-disable-next-line react-hooks/globals -- This callback updates legacy processing state on user/worker events, never during render.
         [decRx, decTx] = [keyFromkeypair.sharedRx, keyFromkeypair.sharedTx];
         if (decRx && decTx) {
           let limitedDecState =
@@ -227,6 +230,7 @@ const LimitedDecryptionPanel = ({ active = true }) => {
     if (decryptionMethod === "secretKey") {
       setIsTestingPassword(true);
 
+      // eslint-disable-next-line react-hooks/globals -- This callback updates legacy processing state on user/worker events, never during render.
       file = File;
       let limitedTestPassword = Password;
 
@@ -291,6 +295,7 @@ const LimitedDecryptionPanel = ({ active = true }) => {
       setWrongPublicKey(false);
       setIsTestingKeys(true);
 
+      // eslint-disable-next-line react-hooks/globals -- This callback updates legacy processing state on user/worker events, never during render.
       file = File;
       let ssk = PrivateKey;
       let cpk = PublicKey;
@@ -389,6 +394,7 @@ const LimitedDecryptionPanel = ({ active = true }) => {
     await _sodium.ready;
     const sodium = _sodium;
 
+    // eslint-disable-next-line react-hooks/globals -- This callback updates legacy processing state on user/worker events, never during render.
     file = File;
 
     let limitedDecSalt = new Uint8Array(salt);
@@ -418,8 +424,10 @@ const LimitedDecryptionPanel = ({ active = true }) => {
   const startLimitedDecryption = async (method, decState) => {
     setIsDecrypting(true);
     setOperationError(false);
+    // eslint-disable-next-line react-hooks/globals -- This callback updates legacy processing state on user/worker events, never during render.
     limitedDecFileBuff = null;
     try {
+      // eslint-disable-next-line react-hooks/globals -- This callback updates legacy processing state on user/worker events, never during render.
       limitedDecFileBuff = await decryptFile(
         _sodium, File, decState, method === "secretKey" ? 51 : 35, CHUNK_SIZE
       );
@@ -450,6 +458,7 @@ const LimitedDecryptionPanel = ({ active = true }) => {
 
   useEffect(() => {
     if (query.tab === "decryption" && query.publicKey) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- Apply public-key invitations from the router after hydration, preserving editable credential state.
       setPublicKey(query.publicKey);
       setPkAlert(true);
       setDecryptionMethod("publicKey");

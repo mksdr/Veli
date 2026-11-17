@@ -23,7 +23,9 @@ const LimitedEncryptionPanel = ({ active = true }) => {
   useEffect(() => () => { limitedEncFileBuff = null; limitedState = null; file = null; encRx = null; encTx = null; }, []);
   const [operationError, setOperationError] = useState(false);
   const handleOperationError = () => {
+    // eslint-disable-next-line react-hooks/globals -- This callback updates legacy processing state on user/worker events, never during render.
     limitedEncFileBuff = null;
+    // eslint-disable-next-line react-hooks/globals -- This callback updates legacy processing state on user/worker events, never during render.
     limitedState = null;
     setIsEncrypting(false);
     setOperationError(true);
@@ -233,6 +235,7 @@ const LimitedEncryptionPanel = ({ active = true }) => {
     setIsEncrypting(true);
     await new Promise(resolve => setTimeout(resolve, 0));
     try {
+      // eslint-disable-next-line react-hooks/globals -- This callback updates legacy processing state on user/worker events, never during render.
       limitedState = null;
       if (encryptionMethod === "secretKey") {
         await limitedEncKeyGenerator(Password);
@@ -276,6 +279,7 @@ const LimitedEncryptionPanel = ({ active = true }) => {
       );
 
       setIsEncrypting(true);
+      // eslint-disable-next-line react-hooks/globals -- This callback updates legacy processing state on user/worker events, never during render.
       limitedEncFileBuff = []; //clear array
       limitedEncFileBuff.push(SIGNATURE);
       limitedEncFileBuff.push(limitedSalt);
@@ -297,6 +301,7 @@ const LimitedEncryptionPanel = ({ active = true }) => {
       );
 
       setIsEncrypting(true);
+      // eslint-disable-next-line react-hooks/globals -- This callback updates legacy processing state on user/worker events, never during render.
       limitedEncFileBuff = []; //clear array
       limitedEncFileBuff.push(SIGNATURE);
       limitedEncFileBuff.push(limitedHeader);
@@ -376,6 +381,7 @@ const LimitedEncryptionPanel = ({ active = true }) => {
 
   useEffect(() => {
     if (query.tab === "encryption" && query.publicKey) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- Apply public-key invitations from the router after hydration, preserving editable credential state.
       setPublicKey(query.publicKey);
       setPkAlert(true);
       setEncryptionMethod("publicKey");

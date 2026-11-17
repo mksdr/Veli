@@ -19,6 +19,7 @@ export function LocaleProvider({ children }) {
     setStoredValue("language", next);
     setLocale(next);
   };
+  // eslint-disable-next-line react-hooks/set-state-in-effect -- Read the browser locale after hydration so the static HTML and first client render agree.
   useEffect(() => { changeLocale(checkLocale()); }, []);
   return <LocaleContext.Provider value={{ locale, changeLocale }}>{children}</LocaleContext.Provider>;
 }

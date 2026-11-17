@@ -39,6 +39,7 @@ export default function FileWorkflow({ direction, active, step, done, buffered =
   useWorkflowStatus(direction, busy, files.length > 0 || !!password || !!privateKey || !!publicKey);
   useEffect(() => {
     if (active && (step > 0 || done)) heading.current?.focus();
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- Reset sensitive visibility and download UI when the externally controlled workflow step changes.
     setVisible(false);
     setDownloadRequested(false);
   }, [active, step, done]);

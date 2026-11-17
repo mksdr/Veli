@@ -123,6 +123,7 @@ export default function DecryptionPanel({ active = true }) {
     setIsTestingPassword(false);
     setIsTestingKeys(false);
     setIsCheckingFile(false);
+    // eslint-disable-next-line react-hooks/globals -- This callback updates legacy processing state on user/worker events, never during render.
     password = null;
     setActiveStep(0);
     setFiles([]);
@@ -133,15 +134,21 @@ export default function DecryptionPanel({ active = true }) {
     setFileMixUp(false);
     setPublicKey();
     setPrivateKey();
+    // eslint-disable-next-line react-hooks/globals -- This callback updates legacy processing state on user/worker events, never during render.
     privateKey = null;
+    // eslint-disable-next-line react-hooks/globals -- This callback updates legacy processing state on user/worker events, never during render.
     publicKey = null;
     setWrongPublicKey(false);
     setWrongPrivateKey(false);
     setKeysError(false);
     setPkAlert(false);
+    // eslint-disable-next-line react-hooks/globals -- This callback updates legacy processing state on user/worker events, never during render.
     file = null;
+    // eslint-disable-next-line react-hooks/globals -- This callback updates legacy processing state on user/worker events, never during render.
     index = null;
+    // eslint-disable-next-line react-hooks/globals -- This callback updates legacy processing state on user/worker events, never during render.
     files = [];
+    // eslint-disable-next-line react-hooks/globals -- This callback updates legacy processing state on user/worker events, never during render.
     numberOfFiles = 0;
     resetCurrFile();
     router.replace(router.pathname);
@@ -258,6 +265,7 @@ export default function DecryptionPanel({ active = true }) {
   const testFilesDecryption = () => {
     setErrorFile(null);
     setOperationError(false);
+    // eslint-disable-next-line react-hooks/globals -- This callback updates legacy processing state on user/worker events, never during render.
     numberOfFiles = files.length;
     if (currFile <= numberOfFiles - 1) {
       testDecryption(files[currFile]);
@@ -341,6 +349,7 @@ export default function DecryptionPanel({ active = true }) {
   const handleEncryptedFilesDownload = async (e) => {
     setIsDownloading(true);
     resetCurrFile();
+    // eslint-disable-next-line react-hooks/globals -- This callback updates legacy processing state on user/worker events, never during render.
     numberOfFiles = Files.length;
     prepareFile();
   };
@@ -478,6 +487,7 @@ export default function DecryptionPanel({ active = true }) {
 
   useEffect(() => {
     if (query.tab === "decryption" && query.publicKey) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- Apply public-key invitations from the router after hydration, preserving editable credential state.
       setPublicKey(query.publicKey);
       publicKey = query.publicKey;
       setPkAlert(true);

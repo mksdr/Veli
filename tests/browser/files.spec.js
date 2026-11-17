@@ -111,6 +111,7 @@ test("cancelling a real page exit keeps streaming encryption alive", async ({ pa
   await page.waitForFunction(() => !!window.resumeEncryption);
   await expect(page.getByRole("tab", { name: "Decrypt files", exact: true })).toBeDisabled();
   const dialog = page.waitForEvent("dialog");
+  // eslint-disable-next-line @next/next/no-location-assign-relative-destination -- Exercise a real document exit and beforeunload prompt rather than client-side routing.
   const leave = page.evaluate(() => window.location.assign("/about/"));
   const prompt = await dialog;
   expect(prompt.type()).toBe("beforeunload");
