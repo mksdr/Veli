@@ -38,6 +38,42 @@ jobs:
           config-file: release-please-config.json
           manifest-file: .release-please-manifest.json
 
+      - name: Checkout trusted release tooling
+        if: steps.release.outputs.pr != ''
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+      - name: Keep release changelog headings free of dates
+        if: steps.release.outputs.pr != ''
+        uses: actions/github-script@ed597411d8f924073f98dfc5c65a23a2325f34cd # v8
+        env:
+          RELEASE_PR: ${{ steps.release.outputs.pr }}
+        with:
+          github-token: ${{ steps.app.outputs.token }}
+          script: |
+            const { normalizeChangelog } = require('./scripts/release-policy.cjs');
+            const { number } = JSON.parse(process.env.RELEASE_PR);
+            const { data: pr } = await github.rest.pulls.get({ ...context.repo, pull_number: number });
+            if (pr.state !== 'open' || pr.base.ref !== 'master' ||
+                pr.head.repo.full_name !== `${context.repo.owner}/${context.repo.repo}`) {
+              throw new Error('Expected an open release PR in this repository targeting master');
+            }
+            const { data: file } = await github.rest.repos.getContent({
+              ...context.repo, path: 'CHANGELOG.md', ref: pr.head.sha
+            });
+            if (file.type !== 'file' || file.encoding !== 'base64') {
+              throw new Error('Expected a UTF-8 changelog file');
+            }
+            const content = Buffer.from(file.content, 'base64').toString('utf8');
+            const formatted = normalizeChangelog(content);
+            if (formatted === content) return;
+            await github.rest.repos.createOrUpdateFileContents({
+              ...context.repo, path: 'CHANGELOG.md', branch: pr.head.ref,
+              sha: file.sha, content: Buffer.from(formatted).toString('base64'),
+              message: 'chore(docs): format release changelog without dates'
+            });
+
   containers:
     needs: release
     if: needs.release.outputs.created == 'true'

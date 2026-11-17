@@ -2,8 +2,12 @@
 
 ## One-time activation
 
-The first automated release is **3.2.4**. Versions through 3.2.3 remain in
-`CHANGELOG.md`; historical commits and tags are not rewritten or backfilled.
+The first automated release is **3.2.4**. The changelog starts at
+**v3.0.0**, retains the v3 release notes through 3.2.3, and omits dates from
+version headings, matching `chore/changelog`. Historical tags are not moved or
+backfilled. After Release Please updates its PR, the workflow normalizes its
+changelog headings to `## vX.Y.Z` before review and merging. This formatting
+commit uses the App token so the required CI runs for the final PR head.
 `bootstrap-sha` records the master revision before automation was introduced.
 The adoption PR must have a Conventional Commit title and this standalone footer
 in its body (and therefore in its squash commit body):

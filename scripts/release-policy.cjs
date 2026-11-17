@@ -23,4 +23,12 @@ function isNewestRelease(tag, releases) {
     compare(release.tag_name.slice(1), version) > 0);
 }
 
-module.exports = { releaseVersion, isNewestRelease };
+function normalizeChangelog(content) {
+  // Keep version headings consistent with the v3 history, without release dates.
+  return content.replace(
+    /^#{2,3} (?:\[v?(\d+\.\d+\.\d+)\]\([^\r\n]*\)|v?(\d+\.\d+\.\d+))(?: \(\d{4}-\d{2}-\d{2}\))?[ \t]*$/gm,
+    (_heading, linkedVersion, version) => `## v${linkedVersion || version}`
+  );
+}
+
+module.exports = { releaseVersion, isNewestRelease, normalizeChangelog };

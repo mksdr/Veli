@@ -48,7 +48,9 @@ for an application compatibility break.
 `package.json` is the source of the application version. The UI reads it directly.
 Do not manually bump versions or rewrite past changelog entries. Release Please
 updates package metadata, the lockfile, its manifest, and the changelog in a
-release PR. Review and merge that PR when ready to publish.
+release PR. The changelog starts at v3.0.0 and uses `## vX.Y.Z` headings without
+dates; the release workflow applies this format to newly generated entries.
+Review and merge that PR when ready to publish.
 
 Application versions do not change hat.sh file signatures or the encrypted file
 format. File-format compatibility changes require explicit compatibility review.
