@@ -1,0 +1,53 @@
+name: Release
+
+on:
+  push:
+    branches: [master]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release-please
+  cancel-in-progress: false
+
+jobs:
+  release:
+    if: github.repository == 'mksdr/Veli' && github.ref == 'refs/heads/master'
+    runs-on: ubuntu-latest
+    outputs:
+      created: ${{ steps.release.outputs.release_created }}
+      tag: ${{ steps.release.outputs.tag_name }}
+    steps:
+      - name: Create release App token
+        id: app
+        uses: actions/create-github-app-token@fee1f7d63c2ff003460e3d139729b119787bc349 # v2
+        with:
+          app-id: ${{ vars.RELEASE_APP_ID }}
+          private-key: ${{ secrets.RELEASE_APP_PRIVATE_KEY }}
+          permission-contents: write
+          permission-pull-requests: write
+          permission-issues: write
+      - name: Update release PR or publish merged release
+        id: release
+        uses: googleapis/release-please-action@8b8fd2cc23b2e18957157a9d923d75aa0c6f6ad5 # v4
+        with:
+          token: ${{ steps.app.outputs.token }}
+          target-branch: master
+          config-file: release-please-config.json
+          manifest-file: .release-please-manifest.json
+
+  containers:
+    needs: release
+    if: needs.release.outputs.created == 'true'
+    permissions:
+      contents: read
+      packages: write
+      attestations: write
+      id-token: write
+    uses: ./.github/workflows/publish-containers.yml
+    with:
+      tag: ${{ needs.release.outputs.tag }}
+    secrets:
+      DOCKERHUB_TOKEN: ${{ secrets.DOCKERHUB_TOKEN }}
