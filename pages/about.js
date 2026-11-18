@@ -163,7 +163,6 @@ export default function About(props) {
           backgroundColor: theme.palette.custom.alabaster.main,
           [theme.breakpoints.up("sm")]: {
             width: "100%",
-            marginLeft: "240px",
             zIndex: theme.zIndex.drawer - 1,
           },
         })}
