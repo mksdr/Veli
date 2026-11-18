@@ -2,8 +2,8 @@ const { test, before } = require("node:test");
 const assert = require("node:assert/strict");
 const sodium = require("libsodium-wrappers-sumo");
 const { encryptLegacy, decryptLegacy, chunkSize } = require("./helpers/legacyCrypto");
-const { pullChunk } = require("../src/utils/secretstream");
-const { decryptFile } = require("../src/utils/decryptFile");
+const { pullChunk } = require("../src/utils/secretstream.ts");
+const { decryptFile } = require("../src/utils/decryptFile.ts");
 const { installWorker } = require("../service-worker/worker");
 const { registerWorker, hasWorkerProtocol } = require("../src/utils/workerSupport");
 const { getStoredValue, setStoredValue } = require("../src/utils/storage");
@@ -122,6 +122,25 @@ test("rejects early FINAL, trailing data, corrupted ciphertext and partial heade
   corrupted[10] ^= 1;
   await assert.rejects(decryptFile(sodium, new Blob([f.header, corrupted]), f.state(), f.header.length, 1024));
   await assert.rejects(decryptFile(sodium, new Blob([f.header]), f.state(), f.header.length));
+});
+
+test("erases decrypted chunks when a later chunk fails authentication", async () => {
+  const f = fixture([new Uint8Array(1024).fill(7), new Uint8Array([8])]);
+  const corrupted = f.chunks[1].slice();
+  corrupted[0] ^= 1;
+  const erased = [];
+  const trackedSodium = {
+    ...sodium,
+    memzero(chunk) {
+      erased.push(chunk);
+      sodium.memzero(chunk);
+    },
+  };
+  await assert.rejects(decryptFile(
+    trackedSodium, new Blob([f.header, f.chunks[0], corrupted]), f.state(), f.header.length, 1024
+  ));
+  assert.equal(erased.length, 1);
+  assert.deepEqual(erased[0], new Uint8Array(1024));
 });
 
 function harness(timeout = 30000) {

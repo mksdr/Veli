@@ -30,6 +30,8 @@ jobs:
       - name: Audit production dependencies
         run: npm audit --omit=dev --audit-level=high
       - run: npm run lint
+      # Manual release retries can check out commits predating TypeScript migration.
+      - run: npm run --if-present typecheck
       - run: npm run test:release
       - run: npm run test:security
       - run: npm run build

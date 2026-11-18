@@ -1,7 +1,15 @@
-const { pullChunk } = require("./secretstream");
+import type Sodium from "libsodium-wrappers-sumo";
+import type { StateAddress } from "libsodium-wrappers-sumo";
+import { pullChunk } from "./secretstream.ts";
 
-async function decryptFile(sodium, file, state, start, chunkSize = 64 * 1024 * 1024) {
-  const chunks = [];
+export async function decryptFile(
+  sodium: typeof Sodium,
+  file: Blob,
+  state: StateAddress,
+  start: number,
+  chunkSize = 64 * 1024 * 1024,
+): Promise<Uint8Array[]> {
+  const chunks: Uint8Array[] = [];
   try {
     if (file.size < start + sodium.crypto_secretstream_xchacha20poly1305_ABYTES) {
       throw new Error("Incomplete encrypted file");
@@ -18,5 +26,3 @@ async function decryptFile(sodium, file, state, start, chunkSize = 64 * 1024 * 1
     throw error;
   }
 }
-
-module.exports = { decryptFile };
