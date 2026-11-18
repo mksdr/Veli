@@ -2,15 +2,21 @@ import { useId, useState } from "react";
 import { Alert, Box, Button, Dialog, DialogActions, DialogContent, DialogContentText, DialogTitle, IconButton, InputAdornment, Paper, Stack, TextField, Tooltip, Typography } from "@mui/material";
 import Visibility from "@mui/icons-material/Visibility";
 import VisibilityOff from "@mui/icons-material/VisibilityOff";
-import { generateAsymmetricKeys } from "../utils/generateAsymmetricKeys";
+import { generateAsymmetricKeys, type AsymmetricKeyPair } from "../utils/generateAsymmetricKeys";
 import { downloadBlob } from "../utils/downloadBlob";
 import { getTranslations as t } from "../../locales";
 import { useWorkflowStatus } from "./WorkflowContext";
 import QuickResponseCode from "./QuickResponseCode";
 import CopyButton from "./ui/CopyButton";
-export default function KeysGeneration({ opened = false, onUsePrivateKey }) {
+
+export interface KeysGenerationProps {
+  opened?: boolean;
+  onUsePrivateKey?: (privateKey: string) => void;
+}
+
+export default function KeysGeneration({ opened = false, onUsePrivateKey }: KeysGenerationProps) {
   const [open, setOpen] = useState(opened);
-  const [keys, setKeys] = useState(null);
+  const [keys, setKeys] = useState<AsymmetricKeyPair | null>(null);
   const [visible, setVisible] = useState(false);
   const [pending, setPending] = useState(false);
   const [error, setError] = useState(false);
@@ -24,7 +30,7 @@ export default function KeysGeneration({ opened = false, onUsePrivateKey }) {
     catch { setError(true); }
     finally { setPending(false); }
   };
-  const download = (value, filename) => { downloadBlob(new Blob([value], { type: "text/plain" }), filename); setRequested(true); };
+  const download = (value: string, filename: string) => { downloadBlob(new Blob([value], { type: "text/plain" }), filename); setRequested(true); };
   return <Box>
     {!opened && <Button onClick={() => setOpen(!open)} aria-expanded={open} aria-controls={`${id}-form`}>{t("key_pair_question")} {t("generate_now_button")}</Button>}
     {open && <Paper id={`${id}-form`} variant="outlined" sx={{ p: 2.5 }}><Stack spacing={2}>

@@ -3,12 +3,24 @@ import { Alert, Box, Button, IconButton, InputAdornment, Stack, TextField, Toolt
 import Visibility from "@mui/icons-material/Visibility";
 import VisibilityOff from "@mui/icons-material/VisibilityOff";
 import { getTranslations as t } from "../../../locales";
-export default function KeyFields({ direction, publicKey, privateKey, onPublicKey, onPrivateKey, publicKeyError, privateKeyError, disabled }) {
+
+export interface KeyFieldsProps {
+  direction: "encrypt" | "decrypt";
+  publicKey?: string;
+  privateKey?: string;
+  onPublicKey: (key: string) => void;
+  onPrivateKey: (key: string) => void;
+  publicKeyError?: boolean;
+  privateKeyError?: boolean;
+  disabled?: boolean;
+}
+
+export default function KeyFields({ direction, publicKey, privateKey, onPublicKey, onPrivateKey, publicKeyError, privateKeyError, disabled }: KeyFieldsProps) {
   const [visible, setVisible] = useState(false);
   const [readError, setReadError] = useState(false);
-  const publicInput = useRef(null), privateInput = useRef(null);
+  const publicInput = useRef<HTMLInputElement>(null), privateInput = useRef<HTMLInputElement>(null);
   const id = useId();
-  const load = async (file, apply) => {
+  const load = async (file: File | undefined, apply: (key: string) => void) => {
     if (!file) return;
     try {
       if (file.size > 1000000) throw new Error("Key file too large");
@@ -22,8 +34,8 @@ export default function KeyFields({ direction, publicKey, privateKey, onPublicKe
       value={publicKey || ""} onChange={event => onPublicKey(event.target.value)} fullWidth required disabled={disabled}
       error={!!publicKeyError} helperText={t(publicKeyError ? "wrong_public_key" : direction === "encrypt" ? "public_key_help_enc" : "public_key_help_dec")}
       inputProps={{ spellCheck: false, autoCapitalize: "none", autoComplete: "off" }} />
-    <Box><input ref={publicInput} id={`${id}-public`} hidden type="file" accept=".public,text/plain" onChange={event => { load(event.target.files[0], onPublicKey); event.target.value = ""; }} />
-      <Button variant="outlined" disabled={disabled} onClick={() => publicInput.current.click()}>{t("load_public_key")}</Button></Box>
+    <Box><input ref={publicInput} id={`${id}-public`} hidden type="file" accept=".public,text/plain" onChange={event => { load(event.target.files?.[0], onPublicKey); event.target.value = ""; }} />
+      <Button variant="outlined" disabled={disabled} onClick={() => publicInput.current?.click()}>{t("load_public_key")}</Button></Box>
     <TextField id={`${direction}-private-key-input`} label={t("private_key")} placeholder={t(direction === "encrypt" ? "enter_private_key_enc" : "enter_private_key_dec")}
       type={visible ? "text" : "password"} value={privateKey || ""} onChange={event => onPrivateKey(event.target.value)} fullWidth required disabled={disabled}
       error={!!privateKeyError} helperText={t(privateKeyError ? "wrong_private_key" : "private_key_help")}
@@ -33,8 +45,8 @@ export default function KeyFields({ direction, publicKey, privateKey, onPublicKe
             {visible ? <VisibilityOff /> : <Visibility />}
           </IconButton>
         </Tooltip></InputAdornment> }} />
-    <Box><input ref={privateInput} id={`${id}-private`} hidden type="file" accept=".private,text/plain" onChange={event => { load(event.target.files[0], onPrivateKey); event.target.value = ""; }} />
-      <Button variant="outlined" disabled={disabled} onClick={() => privateInput.current.click()}>{t("load_private_key")}</Button></Box>
+    <Box><input ref={privateInput} id={`${id}-private`} hidden type="file" accept=".private,text/plain" onChange={event => { load(event.target.files?.[0], onPrivateKey); event.target.value = ""; }} />
+      <Button variant="outlined" disabled={disabled} onClick={() => privateInput.current?.click()}>{t("load_private_key")}</Button></Box>
     {readError && <Alert severity="error">{t("file_read_error")}</Alert>}
   </Stack>;
 }

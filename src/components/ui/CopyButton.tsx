@@ -2,7 +2,16 @@ import { useId, useState } from "react";
 import { Alert, Button, Dialog, DialogActions, DialogContent, DialogContentText, DialogTitle, Snackbar, TextField } from "@mui/material";
 import ContentCopy from "@mui/icons-material/ContentCopy";
 import { getTranslations as t } from "../../../locales";
-export default function CopyButton({ value, label, success, secret = false, disabled = false }) {
+
+export interface CopyButtonProps {
+  value?: string;
+  label: string;
+  success: string;
+  secret?: boolean;
+  disabled?: boolean;
+}
+
+export default function CopyButton({ value, label, success, secret = false, disabled = false }: CopyButtonProps) {
   const [copied, setCopied] = useState(false);
   const [fallback, setFallback] = useState(false);
   const [pending, setPending] = useState(false);
@@ -10,7 +19,7 @@ export default function CopyButton({ value, label, success, secret = false, disa
   const copy = async () => {
     setPending(true);
     try {
-      await navigator.clipboard.writeText(value);
+      await navigator.clipboard.writeText(value ?? "");
       setCopied(true);
     } catch { setFallback(true); }
     finally { setPending(false); }

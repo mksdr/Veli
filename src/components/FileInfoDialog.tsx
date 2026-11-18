@@ -10,16 +10,17 @@ import {
   Button,
   DialogActions
 } from '@mui/material';
-import { FileUtils } from '../utils/fileUtils';
+import { FileUtils, type FileInfo } from '../utils/fileUtils';
 import { getTranslations as t } from '../../locales';
-// interface FileInfoDialogProps {
-//   file: File | null;
-//   display: boolean;
-//   onClose: () => void;
-// }
 
-const FileInfoDialog = ({ file, display, onClose }) => {
-  const [fileInfo, setFileInfo] = useState(null);
+export interface FileInfoDialogProps {
+  file: File | null;
+  display: boolean;
+  onClose: () => void;
+}
+
+const FileInfoDialog = ({ file, display, onClose }: FileInfoDialogProps) => {
+  const [fileInfo, setFileInfo] = useState<FileInfo | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(false);
 

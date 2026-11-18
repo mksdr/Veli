@@ -1,16 +1,17 @@
 import { useId, useState } from "react";
-import { Button, Dialog, DialogActions, DialogContent, DialogContentText, DialogTitle, FormControl, InputLabel, MenuItem, Select } from "@mui/material";
+import { Button, Dialog, DialogActions, DialogContent, DialogContentText, DialogTitle, FormControl, InputLabel, MenuItem, Select, type SelectChangeEvent } from "@mui/material";
 import { getTranslations as t, useLocale } from "../../locales";
-import locales from "../../locales/locales";
+import locales, { type LocaleCode } from "../../locales/locales";
 import { useWorkflow } from "../components/WorkflowContext";
 export default function Language() {
   const { locale, changeLocale } = useLocale();
   const { busy, dirty } = useWorkflow();
-  const [pending, setPending] = useState(null);
+  const [pending, setPending] = useState<LocaleCode | null>(null);
   const id = useId();
-  const choose = event => {
-    if (dirty) setPending(event.target.value);
-    else changeLocale(event.target.value);
+  const choose = (event: SelectChangeEvent<LocaleCode>) => {
+    const next = event.target.value as LocaleCode;
+    if (dirty) setPending(next);
+    else changeLocale(next);
   };
   return <>
     <FormControl size="small" sx={{ minWidth: 130, my: 1 }} disabled={busy}>
@@ -23,7 +24,7 @@ export default function Language() {
       <DialogTitle id={`${id}-title`}>{t("language_restart_title")}</DialogTitle>
       <DialogContent><DialogContentText>{t("language_restart_description")}</DialogContentText></DialogContent>
       <DialogActions><Button onClick={() => setPending(null)}>{t("cancel")}</Button>
-        <Button variant="contained" disabled={busy} onClick={() => changeLocale(pending)}>{t("language_restart")}</Button>
+        <Button variant="contained" disabled={busy} onClick={() => { if (pending) changeLocale(pending); }}>{t("language_restart")}</Button>
       </DialogActions>
     </Dialog>
   </>;

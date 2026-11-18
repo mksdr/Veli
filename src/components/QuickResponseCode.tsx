@@ -3,7 +3,12 @@ import { Box, Button, Dialog, DialogActions, DialogContent, DialogTitle, Stack, 
 import { QRCodeSVG } from "qrcode.react";
 import { getTranslations as t } from "../../locales";
 import CopyButton from "./ui/CopyButton";
-export default function QuickResponseCode({ publicKey }) {
+
+export interface QuickResponseCodeProps {
+  publicKey: string;
+}
+
+export default function QuickResponseCode({ publicKey }: QuickResponseCodeProps) {
   const [open, setOpen] = useState(false);
   const id = useId();
   const url = typeof window === "undefined" ? "" : `${window.location.origin}/?tab=encryption&publicKey=${encodeURIComponent(publicKey)}`;

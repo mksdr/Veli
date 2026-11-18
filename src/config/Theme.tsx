@@ -1,10 +1,42 @@
-import { createContext, useContext, useEffect, useMemo, useState } from "react";
-import { createTheme, ThemeProvider } from "@mui/material/styles";
+import { createContext, useContext, useEffect, useMemo, useState, type ReactNode } from "react";
+import { createTheme, ThemeProvider, type Theme as MuiTheme } from "@mui/material/styles";
 import { CssBaseline, FormControlLabel, Switch } from "@mui/material";
 import { getStoredValue, setStoredValue } from "../utils/storage";
 import { getTranslations as t } from "../../locales";
-const AppearanceContext = createContext({ dark: false, toggle: () => {} });
-export const createAppTheme = (dark = false) => {
+
+export interface CustomPalette {
+  white: { main: string };
+  alabaster: { main: string; dark: string };
+  mountainMist: { main: string };
+  gallery: { main: string };
+  cinnabar: { main: string };
+  denim: { main: string };
+  hawkesBlue: { main: string; light: string };
+  mineShaft: { main: string };
+  emperor: { main: string };
+  mercury: { main: string; light: string };
+  alto: { main: string; light: string };
+  flower: { main: string; light: string; text: string };
+  cottonBoll: { main: string; light: string; text: string };
+  diamondBlack: { main: string };
+}
+
+declare module "@mui/material/styles" {
+  interface Palette {
+    custom: CustomPalette;
+  }
+  interface PaletteOptions {
+    custom?: CustomPalette;
+  }
+}
+
+export interface AppearanceContextValue {
+  dark: boolean;
+  toggle: () => void;
+}
+
+const AppearanceContext = createContext<AppearanceContextValue>({ dark: false, toggle: () => {} });
+export const createAppTheme = (dark = false): MuiTheme => {
   const background = dark ? "#121820" : "#f5f7fa";
   const surface = dark ? "#1c2531" : "#ffffff";
   const text = dark ? "#f0f4f8" : "#202b3b";
@@ -49,7 +81,7 @@ export const createAppTheme = (dark = false) => {
   });
 };
 export const Theme = createAppTheme();
-export function AppearanceProvider({ children }) {
+export function AppearanceProvider({ children }: { children: ReactNode }) {
   const [dark, setDark] = useState(false);
   useEffect(() => {
     const media = window.matchMedia("(prefers-color-scheme: dark)");
