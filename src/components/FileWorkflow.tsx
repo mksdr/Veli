@@ -1,5 +1,6 @@
-import { useEffect, useRef, useState } from "react";
-import { Alert, AlertTitle, Box, Button, CircularProgress, Dialog, DialogActions, DialogContent, DialogContentText, DialogTitle, Divider, IconButton, InputAdornment, MenuItem, Paper, Select, Stack, TextField, Tooltip, Typography } from "@mui/material";
+import { useEffect, useRef, useState, type ReactNode } from "react";
+import { Alert, AlertTitle, Box, Button, CircularProgress, Dialog, DialogActions, DialogContent, DialogContentText, DialogTitle, Divider, IconButton, InputAdornment, MenuItem, Paper, Select, Stack, TextField, Tooltip, Typography, type SelectChangeEvent } from "@mui/material";
+import type { DropzoneRootProps } from "react-dropzone";
 import DescriptionOutlined from "@mui/icons-material/DescriptionOutlined";
 import CheckCircleOutline from "@mui/icons-material/CheckCircleOutline";
 import DeleteOutline from "@mui/icons-material/DeleteOutline";
@@ -17,24 +18,70 @@ import KeyPairGeneration from "./KeyPairGeneration";
 import CopyButton from "./ui/CopyButton";
 import KeyFields from "./ui/KeyFields";
 
+export type EncryptionMethod = "secretKey" | "publicKey";
+export type PasswordGenerationKind = "random" | "words";
+
+export interface FileWorkflowProps {
+  direction: "encrypt" | "decrypt";
+  active?: boolean;
+  step: number;
+  done: boolean;
+  buffered?: boolean;
+  files?: File[];
+  onFiles: (files: File[]) => void;
+  onRemove: (index: number) => void;
+  onFileContinue: () => void;
+  method: EncryptionMethod;
+  onMethod?: (method: EncryptionMethod) => void;
+  password?: string;
+  onPassword: (password: string) => void;
+  onGenerate?: (kind: PasswordGenerationKind) => Promise<void>;
+  publicKey?: string;
+  privateKey?: string;
+  onPublicKey: (key: string) => void;
+  onPrivateKey: (key: string) => void;
+  passwordError?: boolean;
+  publicKeyError?: boolean;
+  privateKeyError?: boolean;
+  keysError?: string | null;
+  fileError?: string | null;
+  operationError?: boolean;
+  errorFile?: string | null;
+  checking?: boolean;
+  testing?: boolean;
+  processing?: boolean;
+  currentFile?: number;
+  onCredentialContinue: () => void;
+  onExecute?: () => void | Promise<void>;
+  onDownload?: () => void;
+  onReset: () => void;
+  onBack: () => void;
+  onCancel?: () => void;
+  rootProps?: DropzoneRootProps;
+  isDragActive?: boolean;
+  publicKeyNotice?: boolean;
+  shareableLink?: string;
+  onCreateLink?: () => Promise<void>;
+}
+
 // The processing adapters own cryptography; this view owns presentation only.
 export default function FileWorkflow({ direction, active, step, done, buffered = false, files = [], onFiles, onRemove,
   onFileContinue, method, onMethod, password, onPassword, onGenerate, publicKey, privateKey, onPublicKey, onPrivateKey,
   passwordError, publicKeyError, privateKeyError, keysError, fileError, operationError, errorFile,
   checking = false, testing = false, processing = false, currentFile = 0,
   onCredentialContinue, onExecute, onDownload, onReset, onBack, onCancel,
-  rootProps, isDragActive, publicKeyNotice, shareableLink, onCreateLink }) {
+  rootProps, isDragActive, publicKeyNotice, shareableLink, onCreateLink }: FileWorkflowProps) {
   const encrypt = direction === "encrypt";
   const [visible, setVisible] = useState(false);
-  const [generation, setGeneration] = useState("random");
+  const [generation, setGeneration] = useState<PasswordGenerationKind>("random");
   const [generating, setGenerating] = useState(false);
   const [generateError, setGenerateError] = useState(false);
-  const [selectedInfo, setSelectedInfo] = useState(null);
+  const [selectedInfo, setSelectedInfo] = useState<File | null>(null);
   const [downloadRequested, setDownloadRequested] = useState(false);
   const [cancelOpen, setCancelOpen] = useState(false);
   const [linkError, setLinkError] = useState(false);
   const [linkPending, setLinkPending] = useState(false);
-  const fileInput = useRef(null), heading = useRef(null), passwordInput = useRef(null), operationAlert = useRef(null);
+  const fileInput = useRef<HTMLInputElement>(null), heading = useRef<HTMLHeadingElement>(null), passwordInput = useRef<HTMLInputElement>(null), operationAlert = useRef<HTMLDivElement>(null);
   const busy = checking || testing || processing || generating || linkPending;
   useWorkflowStatus(direction, busy, files.length > 0 || !!password || !!privateKey || !!publicKey);
   useEffect(() => {
@@ -51,7 +98,7 @@ export default function FileWorkflow({ direction, active, step, done, buffered =
   const generate = async () => {
     setGenerating(true);
     setGenerateError(false);
-    try { await onGenerate(generation); }
+    try { await onGenerate?.(generation); }
     catch { setGenerateError(true); }
     finally { setGenerating(false); }
   };
@@ -62,7 +109,7 @@ export default function FileWorkflow({ direction, active, step, done, buffered =
   const credentialLabel = encrypt ? t("prepare_encryption") : buffered ? t("decrypt_action") : t(method === "publicKey" ? "check_keys" : "check_password");
   const executeLabel = t(buffered ? encrypt ? "encrypt_action" : "decrypt_action" : encrypt ? "encrypt_download" : "decrypt_download");
   const fieldFilled = method === "publicKey" ? !!publicKey && !!privateKey : !!password;
-  const fileRows = (editable) => <Stack spacing={1}>
+  const fileRows = (editable: boolean) => <Stack spacing={1}>
     {files.map((file, index) => <Box key={`${file.name}-${file.size}-${index}`} sx={{ display: "flex", alignItems: "center", gap: 1, p: 1.5, borderRadius: 2, bgcolor: "action.hover", minWidth: 0 }}>
       <DescriptionOutlined color="action" sx={{ flexShrink: 0 }} />
       <Box sx={{ flex: 1, minWidth: 0 }}><Typography variant="body2" sx={{ fontWeight: 600, overflowWrap: "anywhere" }}>{file.name}</Typography>
@@ -71,14 +118,14 @@ export default function FileWorkflow({ direction, active, step, done, buffered =
       {editable && <Tooltip title={t("remove_file")}><IconButton disabled={busy} aria-label={`${t("remove_file")}: ${file.name}`} onClick={() => onRemove(index)}><DeleteOutline /></IconButton></Tooltip>}
     </Box>)}
   </Stack>;
-  const primary = (label, action, disabled, icon = <ArrowForward />) => <Button size="large" fullWidth variant="contained" disabled={disabled || busy} onClick={action} endIcon={icon}>{label}</Button>;
-  const actions = (label, action, disabled) => <Stack direction="row" spacing={1} sx={{ pt: 1 }}>
+  const primary = (label: string, action?: () => void | Promise<void>, disabled?: boolean, icon: ReactNode = <ArrowForward />) => <Button size="large" fullWidth variant="contained" disabled={disabled || busy} onClick={action} endIcon={icon}>{label}</Button>;
+  const actions = (label: string, action?: () => void | Promise<void>, disabled?: boolean) => <Stack direction="row" spacing={1} sx={{ pt: 1 }}>
     <Button onClick={onBack} disabled={busy} sx={{ flexShrink: 0, minWidth: 72, whiteSpace: "nowrap" }}>{t("back")}</Button>{primary(label, action, disabled)}
   </Stack>;
 
   return <Box {...rootProps} sx={{ minWidth: 0 }}>
     <Box component="ol" aria-label={t("step_result")} sx={{ m: 0, mb: 3, p: 0, display: "flex", gap: 1, listStyle: "none" }}>
-      {["step_files", "step_credentials", "step_result"].map((label, index) => <Box component="li" key={label} aria-current={index === currentStep ? "step" : undefined}
+      {(["step_files", "step_credentials", "step_result"] as const).map((label, index) => <Box component="li" key={label} aria-current={index === currentStep ? "step" : undefined}
         sx={{ flex: 1, display: "flex", alignItems: "center", gap: .75, color: index <= currentStep ? "primary.main" : "text.secondary", fontSize: { xs: 12, sm: 14 }, fontWeight: index === currentStep ? 700 : 400 }}>
         <Box aria-hidden="true" sx={{ bgcolor: index <= currentStep ? "primary.main" : "action.hover", color: index <= currentStep ? "primary.contrastText" : "text.secondary", borderRadius: "50%", minWidth: 24, height: 24, display: "grid", placeItems: "center", fontSize: 12 }}>{index < currentStep ? "✓" : index + 1}</Box>{t(label)}
       </Box>)}
@@ -98,8 +145,8 @@ export default function FileWorkflow({ direction, active, step, done, buffered =
           <Box sx={{ p: 2.5, border: "2px dashed", borderColor: isDragActive ? "primary.main" : "divider", borderRadius: 3, textAlign: "center" }}>
             <Box sx={{ mb: 2 }}>{files.length ? fileRows(true) : <><DescriptionOutlined sx={{ fontSize: 40, color: "primary.main", mb: 1 }} /><Typography color="text.secondary" variant="body2">{t("drag_drop")}</Typography></>}</Box>
             <input ref={fileInput} id={encrypt ? "enc-file" : "dec-file"} hidden type="file" multiple={!buffered} disabled={busy}
-              onChange={event => { onFiles(Array.from(event.target.files)); event.target.value = ""; }} />
-            <Button variant="outlined" disabled={busy} onClick={() => fileInput.current.click()}>{t(files.length ? buffered ? "change_file" : "add_files" : buffered ? "browse_file" : "browse_files")}</Button>
+              onChange={event => { if (event.target.files) onFiles(Array.from(event.target.files)); event.target.value = ""; }} />
+            <Button variant="outlined" disabled={busy} onClick={() => fileInput.current?.click()}>{t(files.length ? buffered ? "change_file" : "add_files" : buffered ? "browse_file" : "browse_files")}</Button>
           </Box>
           {primary(t(encrypt ? "continue_password" : "continue_file"), onFileContinue, !files.length)}
         </>}
@@ -120,7 +167,7 @@ export default function FileWorkflow({ direction, active, step, done, buffered =
             {encrypt && <>
               {!!password && <Typography variant="body2" color="text.secondary">{t("password_strength")}: {passwordStrengthCheck(password)[0]}</Typography>}
               <Stack spacing={1} direction={{ xs: "column", sm: "row" }}>
-                <Select size="small" value={generation} onChange={event => setGeneration(event.target.value)} disabled={busy} inputProps={{ "aria-label": t("generate_password") }} sx={{ flex: 1 }}>
+                <Select size="small" value={generation} onChange={(event: SelectChangeEvent<PasswordGenerationKind>) => setGeneration(event.target.value as PasswordGenerationKind)} disabled={busy} inputProps={{ "aria-label": t("generate_password") }} sx={{ flex: 1 }}>
                   <MenuItem value="random">{t("random_password")}</MenuItem><MenuItem value="words">{t("word_password")}</MenuItem>
                 </Select>
                 <Button variant="outlined" disabled={busy} onClick={generate}>{t("make_password")}</Button>
@@ -130,7 +177,7 @@ export default function FileWorkflow({ direction, active, step, done, buffered =
               {!!password && <Box><CopyButton value={password} secret label={t("copy_password")} success={t("password_copied")} disabled={busy} /></Box>}
             </>}
           </>}
-          {encrypt && <Box><Button disabled={busy} onClick={() => onMethod(method === "publicKey" ? "secretKey" : "publicKey")} aria-expanded={method === "publicKey"}>{t(method === "publicKey" ? "use_password" : "advanced_keys")}</Button></Box>}
+          {encrypt && <Box><Button disabled={busy} onClick={() => onMethod?.(method === "publicKey" ? "secretKey" : "publicKey")} aria-expanded={method === "publicKey"}>{t(method === "publicKey" ? "use_password" : "advanced_keys")}</Button></Box>}
           {actions(credentialLabel, onCredentialContinue, !fieldFilled)}
         </>}
         {step === 2 && !done && <>
@@ -144,7 +191,7 @@ export default function FileWorkflow({ direction, active, step, done, buffered =
         {processing && onCancel && <Button color="error" onClick={() => setCancelOpen(true)}>{t("cancel_operation")}</Button>}
         {done && <>
           {fileRows(false)}
-          {buffered && primary(t(encrypt ? "download_encrypted" : "download_decrypted"), () => { onDownload(); setDownloadRequested(true); }, false, <DownloadOutlined />)}
+          {buffered && primary(t(encrypt ? "download_encrypted" : "download_decrypted"), () => { onDownload?.(); setDownloadRequested(true); }, false, <DownloadOutlined />)}
           {downloadRequested && <Alert severity="info">{t("download_requested")}</Alert>}
           {!buffered && <Typography color="text.secondary" role="status">{t("download_check")}</Typography>}
           {encrypt && method !== "publicKey" && <>
@@ -153,7 +200,7 @@ export default function FileWorkflow({ direction, active, step, done, buffered =
           </>}
           {encrypt && method === "publicKey" && <>
             <Alert severity="info">{t("after_enc_note_one")}</Alert>
-            <Button variant="outlined" disabled={linkPending} onClick={async () => { setLinkPending(true); setLinkError(false); try { await onCreateLink(); } catch { setLinkError(true); } finally { setLinkPending(false); } }}>{t("create_shareable_link")}</Button>
+            <Button variant="outlined" disabled={linkPending} onClick={async () => { setLinkPending(true); setLinkError(false); try { await onCreateLink?.(); } catch { setLinkError(true); } finally { setLinkPending(false); } }}>{t("create_shareable_link")}</Button>
             {linkError && <Alert severity="error">{t("invalid_keys_input")}</Alert>}
             {shareableLink && <><TextField label={t("public_link")} value={shareableLink} InputProps={{ readOnly: true }} fullWidth helperText={t("create_shareable_link_note")} />
               <Box><CopyButton value={shareableLink} label={t("copy_link")} success={t("create_shareable_link_copied")} /></Box></>}
@@ -167,7 +214,7 @@ export default function FileWorkflow({ direction, active, step, done, buffered =
     <Dialog open={cancelOpen} onClose={() => setCancelOpen(false)} aria-labelledby={`${direction}-cancel-title`}>
       <DialogTitle id={`${direction}-cancel-title`}>{t("cancel_title")}</DialogTitle>
       <DialogContent><DialogContentText>{t("cancel_description")}</DialogContentText></DialogContent>
-      <DialogActions><Button onClick={() => setCancelOpen(false)}>{t("keep_processing")}</Button><Button color="error" onClick={() => { onCancel(); setCancelOpen(false); }}>{t("cancel_operation")}</Button></DialogActions>
+      <DialogActions><Button onClick={() => setCancelOpen(false)}>{t("keep_processing")}</Button><Button color="error" onClick={() => { onCancel?.(); setCancelOpen(false); }}>{t("cancel_operation")}</Button></DialogActions>
     </Dialog>
   </Box>;
 }

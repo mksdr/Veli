@@ -1,25 +1,29 @@
 import { useState, useEffect } from "react";
 import { useRouter } from "next/router";
 import { useDropzone } from "react-dropzone";
-import FileWorkflow from "../FileWorkflow";
+import _sodium, { type StateAddress } from "libsodium-wrappers-sumo";
+import FileWorkflow, { type EncryptionMethod, type PasswordGenerationKind } from "../FileWorkflow";
 import { getTranslations as t } from "../../../locales";
 import { generatePassword, generatePassPhrase } from "../../utils/generatePassword";
 import { computePublicKey } from "../../utils/computePublicKey";
 import { downloadBlob } from "../../utils/downloadBlob";
-const _sodium = require("libsodium-wrappers-sumo");
 import { MAX_FILE_SIZE, SIGNATURES, CHUNK_SIZE, encoder } from "../../config/Constants";
 
-let file,
-  limitedIndex,
-  limitedSalt,
-  limitedKey,
-  limitedState,
-  limitedHeader,
-  limitedEncFileBuff,
-  encRx,
-  encTx;
+let file: File | null = null,
+  limitedIndex: number | null = null,
+  limitedSalt: Uint8Array | null = null,
+  limitedKey: Uint8Array | null = null,
+  limitedState: StateAddress | null = null,
+  limitedHeader: Uint8Array | null = null,
+  limitedEncFileBuff: Uint8Array[] | null = null,
+  encRx: Uint8Array | null = null,
+  encTx: Uint8Array | null = null;
 
-const LimitedEncryptionPanel = ({ active = true }) => {
+export interface LimitedEncryptionPanelProps {
+  active?: boolean;
+}
+
+const LimitedEncryptionPanel = ({ active = true }: LimitedEncryptionPanelProps) => {
   useEffect(() => () => { limitedEncFileBuff = null; limitedState = null; file = null; encRx = null; encTx = null; }, []);
   const [operationError, setOperationError] = useState(false);
   const handleOperationError = () => {
@@ -37,15 +41,15 @@ const LimitedEncryptionPanel = ({ active = true }) => {
 
   const [activeStep, setActiveStep] = useState(0);
 
-  const [File, setFile] = useState();
+  const [File, setFile] = useState<File | undefined>();
 
   const [largeFile, setLargeFile] = useState(false);
 
-  const [Password, setPassword] = useState();
+  const [Password, setPassword] = useState<string | undefined>();
 
-  const [PublicKey, setPublicKey] = useState();
+  const [PublicKey, setPublicKey] = useState<string | undefined>();
 
-  const [PrivateKey, setPrivateKey] = useState();
+  const [PrivateKey, setPrivateKey] = useState<string | undefined>();
 
   const [wrongPublicKey, setWrongPublicKey] = useState(false);
 
@@ -53,15 +57,15 @@ const LimitedEncryptionPanel = ({ active = true }) => {
 
   const [keysError, setKeysError] = useState(false);
 
-  const [keysErrorMessage, setKeysErrorMessage] = useState();
+  const [keysErrorMessage, setKeysErrorMessage] = useState<string | undefined>();
 
   const [shortPasswordError, setShortPasswordError] = useState(false);
 
-  const [encryptionMethod, setEncryptionMethod] = useState("secretKey");
+  const [encryptionMethod, setEncryptionMethod] = useState<EncryptionMethod>("secretKey");
 
   const [isEncrypting, setIsEncrypting] = useState(false);
 
-  const [shareableLink, setShareableLink] = useState();
+  const [shareableLink, setShareableLink] = useState<string | undefined>();
 
   const [pkAlert, setPkAlert] = useState(false);
 
@@ -86,7 +90,7 @@ const LimitedEncryptionPanel = ({ active = true }) => {
     setShortPasswordError(false);
   };
 
-  const handleRadioChange = (method) => {
+  const handleRadioChange = (method: EncryptionMethod) => {
     setEncryptionMethod(method);
     setWrongPublicKey(false);
     setWrongPrivateKey(false);
@@ -100,27 +104,28 @@ const LimitedEncryptionPanel = ({ active = true }) => {
     limitedKey = null;
     limitedState = null;
     setActiveStep(0);
-    setFile();
-    setPassword();
+    setFile(undefined);
+    setPassword(undefined);
     setIsEncrypting(false);
-    setPublicKey();
-    setPrivateKey();
+    setPublicKey(undefined);
+    setPrivateKey(undefined);
     setWrongPublicKey(false);
     setWrongPrivateKey(false);
     setKeysError(false);
     setShortPasswordError(false);
-    setShareableLink();
+    setShareableLink(undefined);
     setPkAlert(false);
     file = null;
     limitedEncFileBuff = null;
     limitedIndex = null;
-    (encRx = null), (encTx = null);
+    encRx = null;
+    encTx = null;
     router.replace(router.pathname);
   };
 
   const handleMethodStep = () => {
     if (encryptionMethod === "secretKey") {
-      if (Password?.length >= 12) {
+      if (Password && Password.length >= 12) {
         setActiveStep(2);
       } else {
         setShortPasswordError(true);
@@ -128,55 +133,56 @@ const LimitedEncryptionPanel = ({ active = true }) => {
     }
 
     if (encryptionMethod === "publicKey") {
-      let mode = "test";
-      let privateKey = PrivateKey;
-      let publicKey = PublicKey;
+      const mode: "test" | "derive" = "test";
+      const privateKey = PrivateKey;
+      const publicKey = PublicKey;
       encKeyPair(privateKey, publicKey, mode);
     }
   };
 
-  const generatedPassword = async (kind) => {
+  const generatedPassword = async (kind: PasswordGenerationKind) => {
     const generated = await (kind === "words" ? generatePassPhrase() : generatePassword());
     setPassword(generated);
     setShortPasswordError(false);
   };
 
-  const handleLimitedFileInput = (selectedFile) => {
+  const handleLimitedFileInput = (selectedFile?: File) => {
     if (!selectedFile) return;
     setOperationError(false);
     file = selectedFile;
 
     if (file.size > MAX_FILE_SIZE) {
       setLargeFile(true);
-      setFile();
+      setFile(undefined);
     } else {
       setFile(selectedFile);
       setLargeFile(false);
     }
   };
 
-  const handlePasswordInput = (selectedPassword) => {
+  const handlePasswordInput = (selectedPassword: string) => {
     setShortPasswordError(false);
     setPassword(selectedPassword);
   };
 
-  const handlePublicKeyInput = (selectedKey) => {
+  const handlePublicKeyInput = (selectedKey: string) => {
     setPublicKey(selectedKey);
     setWrongPublicKey(false);
   };
 
-  const handlePrivateKeyInput = (selectedKey) => {
+  const handlePrivateKeyInput = (selectedKey: string) => {
     setPrivateKey(selectedKey);
     setWrongPrivateKey(false);
   };
 
-  const encKeyPair = async (csk, spk, mode) => {
+  const encKeyPair = async (csk = "", spk = "", mode: "test" | "derive") => {
     await _sodium.ready;
     const sodium = _sodium;
 
     try {
-      let computed = sodium.crypto_scalarmult_base(sodium.from_base64(csk));
-      computed = sodium.to_base64(computed);
+      const computed = sodium.to_base64(
+        sodium.crypto_scalarmult_base(sodium.from_base64(csk)),
+      );
       if (csk === spk || spk === computed) {
         //wrong keypair
         setKeysError(true);
@@ -196,7 +202,7 @@ const LimitedEncryptionPanel = ({ active = true }) => {
         return;
       }
 
-      let key = sodium.crypto_kx_client_session_keys(
+      const key = sodium.crypto_kx_client_session_keys(
         sodium.crypto_scalarmult_base(sodium.from_base64(csk)),
         sodium.from_base64(csk),
         sodium.from_base64(spk)
@@ -211,7 +217,7 @@ const LimitedEncryptionPanel = ({ active = true }) => {
         }
 
         if (mode === "derive" && encRx && encTx) {
-          let limitedRes =
+          const limitedRes =
             sodium.crypto_secretstream_xchacha20poly1305_init_push(encTx);
           limitedState = limitedRes.state;
           limitedHeader = limitedRes.header;
@@ -223,7 +229,7 @@ const LimitedEncryptionPanel = ({ active = true }) => {
         setKeysErrorMessage(t("invalid_key_pair"));
         return;
       }
-    } catch (error) {
+    } catch {
       setKeysError(true);
       setKeysErrorMessage(t("invalid_keys_input"));
       return;
@@ -238,18 +244,18 @@ const LimitedEncryptionPanel = ({ active = true }) => {
       // eslint-disable-next-line react-hooks/globals -- This callback updates legacy processing state on user/worker events, never during render.
       limitedState = null;
       if (encryptionMethod === "secretKey") {
-        await limitedEncKeyGenerator(Password);
+        await limitedEncKeyGenerator(Password ?? "");
       } else {
         await encKeyPair(PrivateKey, PublicKey, "derive");
       }
-      if (!limitedState) throw new Error("Invalid keys");
+      if (!limitedState || !File) throw new Error("Invalid keys");
       startLimitedEncryption(File);
     } catch {
       handleOperationError();
     }
   };
 
-  const limitedEncKeyGenerator = async (password) => {
+  const limitedEncKeyGenerator = async (password: string) => {
     await _sodium.ready;
     const sodium = _sodium;
 
@@ -264,7 +270,7 @@ const LimitedEncryptionPanel = ({ active = true }) => {
       sodium.crypto_pwhash_ALG_ARGON2ID13
     );
 
-    let limitedRes =
+    const limitedRes =
       sodium.crypto_secretstream_xchacha20poly1305_init_push(limitedKey);
     limitedState = limitedRes.state;
     limitedHeader = limitedRes.header;
@@ -272,7 +278,7 @@ const LimitedEncryptionPanel = ({ active = true }) => {
     limitedKey = null;
   };
 
-  const startLimitedEncryption = (file) => {
+  const startLimitedEncryption = (targetFile: File) => {
     if (encryptionMethod === "secretKey") {
       const SIGNATURE = new Uint8Array(
         encoder.encode(SIGNATURES["v2_symmetric"])
@@ -282,16 +288,16 @@ const LimitedEncryptionPanel = ({ active = true }) => {
       // eslint-disable-next-line react-hooks/globals -- This callback updates legacy processing state on user/worker events, never during render.
       limitedEncFileBuff = []; //clear array
       limitedEncFileBuff.push(SIGNATURE);
-      limitedEncFileBuff.push(limitedSalt);
-      limitedEncFileBuff.push(limitedHeader);
+      if (limitedSalt) limitedEncFileBuff.push(limitedSalt);
+      if (limitedHeader) limitedEncFileBuff.push(limitedHeader);
 
-      file
+      targetFile
         .slice(0, CHUNK_SIZE)
         .arrayBuffer()
         .then((chunk) => {
           limitedIndex = CHUNK_SIZE;
-          let limitedLast = limitedIndex >= file.size;
-          return limitedChunkEncryption(limitedLast, chunk, file);
+          const limitedLast = limitedIndex >= targetFile.size;
+          return limitedChunkEncryption(limitedLast, chunk, targetFile);
         }).catch(handleOperationError);
     }
 
@@ -304,24 +310,28 @@ const LimitedEncryptionPanel = ({ active = true }) => {
       // eslint-disable-next-line react-hooks/globals -- This callback updates legacy processing state on user/worker events, never during render.
       limitedEncFileBuff = []; //clear array
       limitedEncFileBuff.push(SIGNATURE);
-      limitedEncFileBuff.push(limitedHeader);
+      if (limitedHeader) limitedEncFileBuff.push(limitedHeader);
 
-      file
+      targetFile
         .slice(0, CHUNK_SIZE)
         .arrayBuffer()
         .then((chunk) => {
           limitedIndex = CHUNK_SIZE;
-          let limitedLast = limitedIndex >= file.size;
-          return limitedChunkEncryption(limitedLast, chunk, file);
+          const limitedLast = limitedIndex >= targetFile.size;
+          return limitedChunkEncryption(limitedLast, chunk, targetFile);
         }).catch(handleOperationError);
     }
   };
 
-  const limitedChunkEncryption = async (limitedLast, chunk, file) => {
+  const limitedChunkEncryption = async (limitedLast: boolean, chunk: ArrayBuffer, targetFile: File) => {
     await _sodium.ready;
     const sodium = _sodium;
 
-    let limitedTag = limitedLast
+    if (!limitedState || !limitedEncFileBuff) {
+      throw new Error("Invalid encryption state");
+    }
+
+    const limitedTag = limitedLast
       ? sodium.crypto_secretstream_xchacha20poly1305_TAG_FINAL
       : sodium.crypto_secretstream_xchacha20poly1305_TAG_MESSAGE;
 
@@ -340,19 +350,20 @@ const LimitedEncryptionPanel = ({ active = true }) => {
     }
 
     if (!limitedLast) {
-      continueLimitedEncryption(file);
+      continueLimitedEncryption(targetFile);
     }
   };
 
-  const continueLimitedEncryption = (file) => {
-    file
-      .slice(limitedIndex, limitedIndex + CHUNK_SIZE)
+  const continueLimitedEncryption = (targetFile: File) => {
+    const startOffset = limitedIndex ?? 0;
+    targetFile
+      .slice(startOffset, startOffset + CHUNK_SIZE)
       .arrayBuffer()
       .then((chunk) => {
-        limitedIndex += CHUNK_SIZE;
-        let limitedLast = limitedIndex >= file.size;
+        limitedIndex = startOffset + CHUNK_SIZE;
+        const limitedLast = limitedIndex >= targetFile.size;
 
-        return limitedChunkEncryption(limitedLast, chunk, file);
+        return limitedChunkEncryption(limitedLast, chunk, targetFile);
       }).catch(handleOperationError);
   };
 
@@ -368,21 +379,25 @@ const LimitedEncryptionPanel = ({ active = true }) => {
     if (typeof document === "undefined") {
       return;
     }
-    let fileName = File.name + ".enc";
-    let blob = new Blob(limitedEncFileBuff);
+    if (!File || !limitedEncFileBuff) {
+      return;
+    }
+    const fileName = File.name + ".enc";
+    const blob = new Blob(limitedEncFileBuff as BlobPart[]);
     downloadBlob(blob, fileName);
   };
 
   const createShareableLink = async () => {
-    let pk = await computePublicKey(PrivateKey);
-    let link = window.location.origin + "/?tab=decryption&publicKey=" + encodeURIComponent(pk);
+    const pk = await computePublicKey(PrivateKey ?? "");
+    const link = window.location.origin + "/?tab=decryption&publicKey=" + encodeURIComponent(pk);
     setShareableLink(link);
   };
 
   useEffect(() => {
-    if (query.tab === "encryption" && query.publicKey) {
+    const queryPublicKey = Array.isArray(query.publicKey) ? query.publicKey[0] : query.publicKey;
+    if (query.tab === "encryption" && queryPublicKey) {
       // eslint-disable-next-line react-hooks/set-state-in-effect -- Apply public-key invitations from the router after hydration, preserving editable credential state.
-      setPublicKey(query.publicKey);
+      setPublicKey(queryPublicKey);
       setPkAlert(true);
       setEncryptionMethod("publicKey");
     }
@@ -390,7 +405,7 @@ const LimitedEncryptionPanel = ({ active = true }) => {
 
   return <FileWorkflow
     direction="encrypt" active={active} step={activeStep} done={activeStep === 3} buffered
-    files={File ? [File] : []} onFiles={selected => handleLimitedFileInput(selected[0])} onRemove={() => setFile()} onFileContinue={handleNext}
+    files={File ? [File] : []} onFiles={selected => handleLimitedFileInput(selected[0])} onRemove={() => setFile(undefined)} onFileContinue={handleNext}
     method={encryptionMethod} password={Password} onPassword={handlePasswordInput}
     publicKey={PublicKey} privateKey={PrivateKey} onPublicKey={handlePublicKeyInput} onPrivateKey={handlePrivateKeyInput}
     publicKeyError={wrongPublicKey} privateKeyError={wrongPrivateKey} keysError={keysError ? keysErrorMessage : null}
@@ -401,6 +416,6 @@ const LimitedEncryptionPanel = ({ active = true }) => {
     onMethod={handleRadioChange} onGenerate={generatedPassword} shareableLink={shareableLink} onCreateLink={createShareableLink}
     onExecute={handleEncryptionRequest} onDownload={handleEncryptedFileDownload}
   />;
-}
+};
 
 export default LimitedEncryptionPanel;

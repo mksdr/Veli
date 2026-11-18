@@ -1,22 +1,25 @@
 import { useState, useEffect } from "react";
 import { useRouter } from "next/router";
 import { useDropzone } from "react-dropzone";
-import FileWorkflow from "../FileWorkflow";
+import _sodium, { type StateAddress } from "libsodium-wrappers-sumo";
+import FileWorkflow, { type EncryptionMethod } from "../FileWorkflow";
 import { getTranslations as t } from "../../../locales";
 import { downloadBlob } from "../../utils/downloadBlob";
-const _sodium = require("libsodium-wrappers-sumo");
 import { decryptFile } from "../../utils/decryptFile";
 import { formatName } from "../../helpers/formatName";
 import { MAX_FILE_SIZE, SIGNATURES, CHUNK_SIZE, decoder } from "../../config/Constants";
 
-let file,
-  limitedDecIndex,
-  limitedTestDecFileBuff,
-  limitedDecFileBuff,
-  decRx,
-  decTx;
+let file: File | null | undefined = null,
+  limitedTestDecFileBuff: ArrayBuffer | null = null,
+  limitedDecFileBuff: Uint8Array[] | null = null,
+  decRx: Uint8Array | null = null,
+  decTx: Uint8Array | null = null;
 
-const LimitedDecryptionPanel = ({ active = true }) => {
+export interface LimitedDecryptionPanelProps {
+  active?: boolean;
+}
+
+const LimitedDecryptionPanel = ({ active = true }: LimitedDecryptionPanelProps) => {
   useEffect(() => () => { limitedDecFileBuff = null; limitedTestDecFileBuff = null; file = null; decRx = null; decTx = null; }, []);
   const [operationError, setOperationError] = useState(false);
   const handleOperationError = () => {
@@ -38,17 +41,17 @@ const LimitedDecryptionPanel = ({ active = true }) => {
 
   const query = router.query;
 
-  const [File, setFile] = useState();
+  const [File, setFile] = useState<File | undefined>();
 
   const [largeFile, setLargeFile] = useState(false);
 
-  const [Password, setPassword] = useState();
+  const [Password, setPassword] = useState<string | undefined>();
 
-  const [decryptionMethod, setDecryptionMethod] = useState("secretKey");
+  const [decryptionMethod, setDecryptionMethod] = useState<EncryptionMethod>("secretKey");
 
-  const [PublicKey, setPublicKey] = useState();
+  const [PublicKey, setPublicKey] = useState<string | undefined>();
 
-  const [PrivateKey, setPrivateKey] = useState();
+  const [PrivateKey, setPrivateKey] = useState<string | undefined>();
 
   const [wrongPublicKey, setWrongPublicKey] = useState(false);
 
@@ -56,7 +59,7 @@ const LimitedDecryptionPanel = ({ active = true }) => {
 
   const [keysError, setKeysError] = useState(false);
 
-  const [keysErrorMessage, setKeysErrorMessage] = useState();
+  const [keysErrorMessage, setKeysErrorMessage] = useState<string | undefined>();
 
   const [isCheckingFile, setIsCheckingFile] = useState(false);
 
@@ -105,31 +108,31 @@ const LimitedDecryptionPanel = ({ active = true }) => {
     setOperationError(false);
     setIsDecrypting(false);
     setActiveStep(0);
-    setFile();
-    setPassword();
+    setFile(undefined);
+    setPassword(undefined);
     setWrongPassword(false);
     setbadFile(false);
     setOldVersion(false);
-    setPublicKey();
-    setPrivateKey();
+    setPublicKey(undefined);
+    setPrivateKey(undefined);
     setWrongPublicKey(false);
     setWrongPrivateKey(false);
     setKeysError(false);
     setPkAlert(false);
     file = null;
-    limitedDecIndex = null;
-    (decRx = null), (decTx = null);
+    decRx = null;
+    decTx = null;
     router.replace(router.pathname);
   };
 
-  const handleLimitedFileInput = (selectedFile) => {
+  const handleLimitedFileInput = (selectedFile?: File) => {
     if (!selectedFile) return;
     setOperationError(false);
     file = selectedFile;
 
     if (file.size > MAX_FILE_SIZE) {
       setLargeFile(true);
-      setFile();
+      setFile(undefined);
     } else {
       setFile(selectedFile);
       setLargeFile(false);
@@ -140,12 +143,13 @@ const LimitedDecryptionPanel = ({ active = true }) => {
   };
 
   const removeFile = () => {
-    setFile();
+    setFile(undefined);
     setbadFile(false);
     setOldVersion(false);
-  }
+  };
 
   const checkFile = () => {
+    if (!file) return;
     setIsCheckingFile(true);
     setbadFile(false);
     setOldVersion(false);
@@ -172,27 +176,27 @@ const LimitedDecryptionPanel = ({ active = true }) => {
     }).catch(handleOperationError);
   };
 
-  const handlePasswordInput = (selectedPassword) => {
+  const handlePasswordInput = (selectedPassword: string) => {
     setPassword(selectedPassword);
     setWrongPassword(false);
   };
 
-  const handlePublicKeyInput = (selectedKey) => {
+  const handlePublicKeyInput = (selectedKey: string) => {
     setPublicKey(selectedKey);
     setWrongPublicKey(false);
   };
 
-  const handlePrivateKeyInput = (selectedKey) => {
+  const handlePrivateKeyInput = (selectedKey: string) => {
     setPrivateKey(selectedKey);
     setWrongPrivateKey(false);
   };
 
-  const requestDecKeyPair = async (ssk, cpk, header, decFileBuff) => {
+  const requestDecKeyPair = async (ssk: string, cpk: string, header: ArrayBuffer | Uint8Array) => {
     await _sodium.ready;
     const sodium = _sodium;
 
     try {
-      let keyFromkeypair = sodium.crypto_kx_server_session_keys(
+      const keyFromkeypair = sodium.crypto_kx_server_session_keys(
         sodium.crypto_scalarmult_base(sodium.from_base64(ssk)),
         sodium.from_base64(ssk),
         sodium.from_base64(cpk)
@@ -202,7 +206,7 @@ const LimitedDecryptionPanel = ({ active = true }) => {
         // eslint-disable-next-line react-hooks/globals -- This callback updates legacy processing state on user/worker events, never during render.
         [decRx, decTx] = [keyFromkeypair.sharedRx, keyFromkeypair.sharedTx];
         if (decRx && decTx) {
-          let limitedDecState =
+          const limitedDecState =
             sodium.crypto_secretstream_xchacha20poly1305_init_pull(
               new Uint8Array(header),
               decRx
@@ -215,7 +219,7 @@ const LimitedDecryptionPanel = ({ active = true }) => {
           }
         }
       }
-    } catch (error) {
+    } catch {
       setKeysError(true);
       setKeysErrorMessage(t("invalid_keys_input"));
       setIsTestingKeys(false);
@@ -228,11 +232,12 @@ const LimitedDecryptionPanel = ({ active = true }) => {
     const sodium = _sodium;
 
     if (decryptionMethod === "secretKey") {
+      if (!File) return;
       setIsTestingPassword(true);
 
       // eslint-disable-next-line react-hooks/globals -- This callback updates legacy processing state on user/worker events, never during render.
       file = File;
-      let limitedTestPassword = Password;
+      const limitedTestPassword = Password ?? "";
 
       Promise.all([
         file.slice(11, 27).arrayBuffer(), //salt
@@ -248,10 +253,10 @@ const LimitedDecryptionPanel = ({ active = true }) => {
       ]).then(([limitedTestSalt, limitedTestHeader, limitedTestChunk]) => {
         limitedTestDecFileBuff = limitedTestChunk; //for testing the dec password
 
-        let decLimitedTestsalt = new Uint8Array(limitedTestSalt);
-        let decLimitedTestheader = new Uint8Array(limitedTestHeader);
+        const decLimitedTestsalt = new Uint8Array(limitedTestSalt);
+        const decLimitedTestheader = new Uint8Array(limitedTestHeader);
 
-        let decLimitedTestKey = sodium.crypto_pwhash(
+        const decLimitedTestKey = sodium.crypto_pwhash(
           sodium.crypto_secretstream_xchacha20poly1305_KEYBYTES,
           limitedTestPassword,
           decLimitedTestsalt,
@@ -260,17 +265,18 @@ const LimitedDecryptionPanel = ({ active = true }) => {
           sodium.crypto_pwhash_ALG_ARGON2ID13
         );
 
-        let limitedTestState =
+        const limitedTestState =
           sodium.crypto_secretstream_xchacha20poly1305_init_pull(
             decLimitedTestheader,
             decLimitedTestKey
           );
 
         if (limitedTestState) {
-          let decLimitedTestresults =
+          const decLimitedTestresults =
             sodium.crypto_secretstream_xchacha20poly1305_pull(
               limitedTestState,
-              new Uint8Array(limitedTestDecFileBuff)
+              new Uint8Array(limitedTestDecFileBuff),
+              null
             );
           if (decLimitedTestresults) {
             setIsTestingPassword(false);
@@ -289,6 +295,7 @@ const LimitedDecryptionPanel = ({ active = true }) => {
     }
 
     if (decryptionMethod === "publicKey") {
+      if (!File) return;
       // requestDecKeyPair()
       setKeysError(false);
       setWrongPrivateKey(false);
@@ -297,8 +304,8 @@ const LimitedDecryptionPanel = ({ active = true }) => {
 
       // eslint-disable-next-line react-hooks/globals -- This callback updates legacy processing state on user/worker events, never during render.
       file = File;
-      let ssk = PrivateKey;
-      let cpk = PublicKey;
+      const ssk = PrivateKey ?? "";
+      const cpk = PublicKey ?? "";
 
       Promise.all([
         file.slice(11, 35).arrayBuffer(), //header
@@ -313,11 +320,12 @@ const LimitedDecryptionPanel = ({ active = true }) => {
       ]).then(([limitedTestHeader, limitedTestChunk]) => {
         limitedTestDecFileBuff = limitedTestChunk; //for testing the dec password
 
-        let decLimitedTestheader = new Uint8Array(limitedTestHeader);
+        const decLimitedTestheader = new Uint8Array(limitedTestHeader);
 
         try {
-          let computed = sodium.crypto_scalarmult_base(sodium.from_base64(ssk));
-          computed = sodium.to_base64(computed);
+          const computed = sodium.to_base64(
+            sodium.crypto_scalarmult_base(sodium.from_base64(ssk)),
+          );
           if (ssk === cpk || cpk === computed) {
             setKeysError(true);
             setKeysErrorMessage(t("invalid_key_pair"));
@@ -341,7 +349,7 @@ const LimitedDecryptionPanel = ({ active = true }) => {
             return;
           }
 
-          let limitedDecKey = sodium.crypto_kx_server_session_keys(
+          const limitedDecKey = sodium.crypto_kx_server_session_keys(
             sodium.crypto_scalarmult_base(sodium.from_base64(ssk)),
             sodium.from_base64(ssk),
             sodium.from_base64(cpk)
@@ -351,17 +359,18 @@ const LimitedDecryptionPanel = ({ active = true }) => {
             [decRx, decTx] = [limitedDecKey.sharedRx, limitedDecKey.sharedTx];
 
             if (decRx && decTx) {
-              let limitedDecState =
+              const limitedDecState =
                 sodium.crypto_secretstream_xchacha20poly1305_init_pull(
                   new Uint8Array(decLimitedTestheader),
                   decRx
                 );
 
               if (limitedDecState) {
-                let decTestresults =
+                const decTestresults =
                   sodium.crypto_secretstream_xchacha20poly1305_pull(
                     limitedDecState,
-                    new Uint8Array(limitedTestDecFileBuff)
+                    new Uint8Array(limitedTestDecFileBuff),
+                    null
                   );
 
                 if (decTestresults) {
@@ -370,8 +379,7 @@ const LimitedDecryptionPanel = ({ active = true }) => {
                   requestDecKeyPair(
                     ssk,
                     cpk,
-                    decLimitedTestheader,
-                    limitedTestDecFileBuff
+                    decLimitedTestheader
                   );
                 } else {
                   setWrongPublicKey(true);
@@ -381,7 +389,7 @@ const LimitedDecryptionPanel = ({ active = true }) => {
               }
             }
           }
-        } catch (error) {
+        } catch {
           setKeysError(true);
           setKeysErrorMessage(t("invalid_keys_input"));
           setIsTestingKeys(false);
@@ -390,17 +398,17 @@ const LimitedDecryptionPanel = ({ active = true }) => {
     }
   };
 
-  const limitedDecKeyGenerator = async (password, salt, header) => {
+  const limitedDecKeyGenerator = async (password: string, salt: ArrayBuffer, header: ArrayBuffer) => {
     await _sodium.ready;
     const sodium = _sodium;
 
     // eslint-disable-next-line react-hooks/globals -- This callback updates legacy processing state on user/worker events, never during render.
     file = File;
 
-    let limitedDecSalt = new Uint8Array(salt);
-    let limitedDecHeader = new Uint8Array(header);
+    const limitedDecSalt = new Uint8Array(salt);
+    const limitedDecHeader = new Uint8Array(header);
 
-    let limitedDecKey = sodium.crypto_pwhash(
+    const limitedDecKey = sodium.crypto_pwhash(
       sodium.crypto_secretstream_xchacha20poly1305_KEYBYTES,
       password,
       limitedDecSalt,
@@ -409,7 +417,7 @@ const LimitedDecryptionPanel = ({ active = true }) => {
       sodium.crypto_pwhash_ALG_ARGON2ID13
     );
 
-    let limitedDecState =
+    const limitedDecState =
       sodium.crypto_secretstream_xchacha20poly1305_init_pull(
         limitedDecHeader,
         limitedDecKey
@@ -421,12 +429,13 @@ const LimitedDecryptionPanel = ({ active = true }) => {
     }
   };
 
-  const startLimitedDecryption = async (method, decState) => {
+  const startLimitedDecryption = async (method: EncryptionMethod, decState: StateAddress) => {
     setIsDecrypting(true);
     setOperationError(false);
     // eslint-disable-next-line react-hooks/globals -- This callback updates legacy processing state on user/worker events, never during render.
     limitedDecFileBuff = null;
     try {
+      if (!File) throw new Error("No file selected");
       // eslint-disable-next-line react-hooks/globals -- This callback updates legacy processing state on user/worker events, never during render.
       limitedDecFileBuff = await decryptFile(
         _sodium, File, decState, method === "secretKey" ? 51 : 35, CHUNK_SIZE
@@ -449,17 +458,21 @@ const LimitedDecryptionPanel = ({ active = true }) => {
     if (typeof document === "undefined") {
       return;
     }
-    let fileName = formatName(File.name);
+    if (!File || !limitedDecFileBuff) {
+      return;
+    }
+    const fileName = formatName(File.name);
 
-    let blob = new Blob(limitedDecFileBuff);
+    const blob = new Blob(limitedDecFileBuff as BlobPart[]);
 
     downloadBlob(blob, fileName);
   };
 
   useEffect(() => {
-    if (query.tab === "decryption" && query.publicKey) {
+    const queryPublicKey = Array.isArray(query.publicKey) ? query.publicKey[0] : query.publicKey;
+    if (query.tab === "decryption" && queryPublicKey) {
       // eslint-disable-next-line react-hooks/set-state-in-effect -- Apply public-key invitations from the router after hydration, preserving editable credential state.
-      setPublicKey(query.publicKey);
+      setPublicKey(queryPublicKey);
       setPkAlert(true);
       setDecryptionMethod("publicKey");
     }
@@ -476,6 +489,6 @@ const LimitedDecryptionPanel = ({ active = true }) => {
     rootProps={getRootProps()} isDragActive={isDragActive} publicKeyNotice={pkAlert}
     onDownload={handleDecryptedFileDownload}
   />;
-}
+};
 
 export default LimitedDecryptionPanel;

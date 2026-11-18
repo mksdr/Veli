@@ -1,3 +1,4 @@
+import type { AppProps } from "next/app";
 import Head from "next/head";
 import { getTranslations as t } from "../locales";
 import "../public/assets/styles/style.css";
@@ -5,7 +6,7 @@ import { AppearanceProvider } from "../src/config/Theme";
 import { LocaleProvider, useLocale } from "../locales";
 import { WorkflowProvider } from "../src/components/WorkflowContext";
 
-function AppContent({ Component, pageProps }) {
+function AppContent({ Component, pageProps }: AppProps) {
   const { locale } = useLocale();
   return (
     <>
@@ -44,6 +45,6 @@ function AppContent({ Component, pageProps }) {
   );
 }
 
-export default function MyApp(props) {
+export default function MyApp(props: AppProps) {
   return <LocaleProvider><AppContent {...props} /></LocaleProvider>;
 }

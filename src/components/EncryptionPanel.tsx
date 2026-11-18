@@ -1,26 +1,35 @@
 import { useState, useEffect } from "react";
 import { useRouter } from "next/router";
 import { useDropzone } from "react-dropzone";
-import FileWorkflow from "./FileWorkflow";
+import FileWorkflow, { type EncryptionMethod, type PasswordGenerationKind } from "./FileWorkflow";
 import { getTranslations as t } from "../../locales";
 import { generatePassword, generatePassPhrase } from "../utils/generatePassword";
 import { computePublicKey } from "../utils/computePublicKey";
 import { CHUNK_SIZE } from "../config/Constants";
 import { downloadStream } from "../utils/downloadStream";
 
-let file,
-  files = [],
-  password,
-  index,
+let file: File | null = null,
+  files: File[] = [],
+  password: string | null | undefined,
+  index: number | null = null,
   currFile = 0,
-  numberOfFiles,
-  encryptionMethodState = "secretKey",
-  privateKey,
-  publicKey;
+  numberOfFiles = 0,
+  encryptionMethodState: EncryptionMethod = "secretKey",
+  privateKey: string | null | undefined,
+  publicKey: string | null | undefined;
 
-let operationId, downloadUrl, nextFileTimer, pendingRequestId, releaseDownload;
-const postToWorker = (worker, data, transfer = []) =>
-  worker.postMessage({ ...data, operationId }, transfer);
+let operationId: string | null = null,
+  downloadUrl: string | null = null,
+  nextFileTimer: ReturnType<typeof setTimeout> | undefined,
+  pendingRequestId: string | null = null,
+  releaseDownload: (() => void) | null = null;
+
+const postToWorker = (
+  worker: ServiceWorker | MessagePort | MessageEventSource | null,
+  data: Record<string, unknown>,
+  transfer: Transferable[] = [],
+) => (worker as ServiceWorker).postMessage({ ...data, operationId }, transfer);
+
 const cancelOperation = () => {
   releaseDownload?.();
   releaseDownload = null;
@@ -33,12 +42,16 @@ const cancelOperation = () => {
   downloadUrl = null;
 };
 
-export default function EncryptionPanel({ active = true }) {
+export interface EncryptionPanelProps {
+  active?: boolean;
+}
+
+export default function EncryptionPanel({ active = true }: EncryptionPanelProps) {
 
   const [operationError, setOperationError] = useState(false);
-  const [errorFile, setErrorFile] = useState(null);
+  const [errorFile, setErrorFile] = useState<string | null>(null);
   const handleOperationError = () => {
-    setErrorFile(files[currFile]?.name);
+    setErrorFile(files[currFile]?.name ?? null);
     cancelOperation();
     setOperationError(true);
     setIsTestingKeys(false);
@@ -52,16 +65,16 @@ export default function EncryptionPanel({ active = true }) {
 
   const [activeStep, setActiveStep] = useState(0);
 
-  const [Files, setFiles] = useState([]);
+  const [Files, setFiles] = useState<File[]>([]);
 
   const [currFileState, setCurrFileState] = useState(0);
 
 
-  const [Password, setPassword] = useState();
+  const [Password, setPassword] = useState<string | undefined>();
 
-  const [PublicKey, setPublicKey] = useState();
+  const [PublicKey, setPublicKey] = useState<string | undefined>();
 
-  const [PrivateKey, setPrivateKey] = useState();
+  const [PrivateKey, setPrivateKey] = useState<string | undefined>();
 
   const [wrongPublicKey, setWrongPublicKey] = useState(false);
 
@@ -69,17 +82,17 @@ export default function EncryptionPanel({ active = true }) {
 
   const [keysError, setKeysError] = useState(false);
 
-  const [keysErrorMessage, setKeysErrorMessage] = useState();
+  const [keysErrorMessage, setKeysErrorMessage] = useState<string | undefined>();
 
   const [shortPasswordError, setShortPasswordError] = useState(false);
 
-  const [encryptionMethod, setEncryptionMethod] = useState("secretKey");
+  const [encryptionMethod, setEncryptionMethod] = useState<EncryptionMethod>("secretKey");
 
   const [isTestingKeys, setIsTestingKeys] = useState(false);
 
   const [isDownloading, setIsDownloading] = useState(false);
 
-  const [shareableLink, setShareableLink] = useState();
+  const [shareableLink, setShareableLink] = useState<string | undefined>();
 
   const [pkAlert, setPkAlert] = useState(false);
 
@@ -104,7 +117,7 @@ export default function EncryptionPanel({ active = true }) {
     setShortPasswordError(false);
   };
 
-  const handleRadioChange = (method) => {
+  const handleRadioChange = (method: EncryptionMethod) => {
     setEncryptionMethod(method);
     setWrongPublicKey(false);
     setWrongPrivateKey(false);
@@ -122,9 +135,9 @@ export default function EncryptionPanel({ active = true }) {
     password = null;
     setActiveStep(0);
     setFiles([]);
-    setPassword();
-    setPublicKey();
-    setPrivateKey();
+    setPassword(undefined);
+    setPublicKey(undefined);
+    setPrivateKey(undefined);
     // eslint-disable-next-line react-hooks/globals -- This callback updates legacy processing state on user/worker events, never during render.
     privateKey = null;
     // eslint-disable-next-line react-hooks/globals -- This callback updates legacy processing state on user/worker events, never during render.
@@ -134,7 +147,7 @@ export default function EncryptionPanel({ active = true }) {
     setKeysError(false);
     setShortPasswordError(false);
     setIsDownloading(false);
-    setShareableLink();
+    setShareableLink(undefined);
     setPkAlert(false);
     // eslint-disable-next-line react-hooks/globals -- This callback updates legacy processing state on user/worker events, never during render.
     file = null;
@@ -160,7 +173,7 @@ export default function EncryptionPanel({ active = true }) {
 
   const handleMethodStep = () => {
     if (encryptionMethodState === "secretKey") {
-      if (Password?.length >= 12) {
+      if (Password && Password.length >= 12) {
         setActiveStep(2);
       } else {
         setShortPasswordError(true);
@@ -170,7 +183,7 @@ export default function EncryptionPanel({ active = true }) {
     if (encryptionMethodState === "publicKey") {
       setIsTestingKeys(true);
       navigator.serviceWorker.ready.then((reg) => {
-        let mode = "test";
+        const mode = "test";
 
         postToWorker(reg.active, {
           cmd: "requestEncKeyPair",
@@ -182,20 +195,20 @@ export default function EncryptionPanel({ active = true }) {
     }
   };
 
-  const generatedPassword = async (kind) => {
+  const generatedPassword = async (kind: PasswordGenerationKind) => {
     const generated = await (kind === "words" ? generatePassPhrase() : generatePassword());
     password = generated;
     setPassword(generated);
     setShortPasswordError(false);
   };
 
-  const handleFilesInput = (selectedFiles) => {
+  const handleFilesInput = (selectedFiles: File[]) => {
     selectedFiles = Array.from(selectedFiles);
     if (files.length > 0) {
       files = files.concat(selectedFiles);
       files = files.filter(
-        (thing, index, self) =>
-          index ===
+        (thing, idx, self) =>
+          idx ===
           self.findIndex((t) => t.name === thing.name && t.size === thing.size)
       );
     } else {
@@ -204,31 +217,31 @@ export default function EncryptionPanel({ active = true }) {
     setFiles(files);
   };
 
-  const updateFilesInput = (index) => {
-    files = [...files.slice(0, index), ...files.slice(index + 1)];
+  const updateFilesInput = (fileIndex: number) => {
+    files = [...files.slice(0, fileIndex), ...files.slice(fileIndex + 1)];
     setFiles(files);
   };
 
 
-  const handlePasswordInput = (selectedPassword) => {
+  const handlePasswordInput = (selectedPassword: string) => {
     setShortPasswordError(false);
     password = selectedPassword;
     setPassword(selectedPassword);
   };
 
-  const handlePublicKeyInput = (selectedKey) => {
+  const handlePublicKeyInput = (selectedKey: string) => {
     setPublicKey(selectedKey);
     publicKey = selectedKey;
     setWrongPublicKey(false);
   };
 
-  const handlePrivateKeyInput = (selectedKey) => {
+  const handlePrivateKeyInput = (selectedKey: string) => {
     setPrivateKey(selectedKey);
     privateKey = selectedKey;
     setWrongPrivateKey(false);
   };
 
-  const handleEncryptedFilesDownload = async (e) => {
+  const handleEncryptedFilesDownload = async () => {
     setIsDownloading(true);
     resetCurrFile();
     // eslint-disable-next-line react-hooks/globals -- This callback updates legacy processing state on user/worker events, never during render.
@@ -241,7 +254,7 @@ export default function EncryptionPanel({ active = true }) {
     pendingRequestId = requestId;
     setOperationError(false);
     // send file name to sw
-    let fileName = files[currFile].name + ".enc";
+    const fileName = files[currFile].name + ".enc";
     navigator.serviceWorker.ready.then((reg) => {
       if (pendingRequestId !== requestId) return;
       postToWorker(reg.active, { cmd: "prepareFileNameEnc", fileName, requestId });
@@ -253,13 +266,13 @@ export default function EncryptionPanel({ active = true }) {
     if (currFile <= numberOfFiles - 1) {
       file = files[currFile];
       releaseDownload?.();
-      releaseDownload = downloadStream(downloadUrl);
+      if (downloadUrl) releaseDownload = downloadStream(downloadUrl);
       setIsDownloading(true);
 
       if (encryptionMethodState === "publicKey") {
         navigator.serviceWorker.ready.then((reg) => {
           if (currentOperation !== operationId) return;
-          let mode = "derive";
+          const mode = "derive";
 
           postToWorker(reg.active, {
             cmd: "requestEncKeyPair",
@@ -281,11 +294,12 @@ export default function EncryptionPanel({ active = true }) {
     }
   };
 
-  const startEncryption = (method) => {
+  const startEncryption = (method: EncryptionMethod) => {
     const currentOperation = operationId;
     navigator.serviceWorker.ready.then((reg) => {
-      if (currentOperation !== operationId) return;
-      file
+      if (currentOperation !== operationId || !file) return;
+      const currentFile = file;
+      currentFile
         .slice(0, CHUNK_SIZE)
         .arrayBuffer()
         .then((chunk) => {
@@ -294,7 +308,7 @@ export default function EncryptionPanel({ active = true }) {
 
           if (method === "secretKey") {
             postToWorker(reg.active,
-              { cmd: "encryptFirstChunk", chunk, last: index >= file.size },
+              { cmd: "encryptFirstChunk", chunk, last: index >= currentFile.size },
               [chunk]
             );
           }
@@ -303,7 +317,7 @@ export default function EncryptionPanel({ active = true }) {
               {
                 cmd: "asymmetricEncryptFirstChunk",
                 chunk,
-                last: index >= file.size,
+                last: index >= currentFile.size,
               },
               [chunk]
             );
@@ -312,18 +326,19 @@ export default function EncryptionPanel({ active = true }) {
     });
   };
 
-  const continueEncryption = (e) => {
+  const continueEncryption = (e: MessageEvent) => {
     const currentOperation = operationId;
-    navigator.serviceWorker.ready.then((reg) => {
-      if (currentOperation !== operationId) return;
-      file
+    navigator.serviceWorker.ready.then(() => {
+      if (currentOperation !== operationId || !file || index === null) return;
+      const currentFile = file;
+      currentFile
         .slice(index, index + CHUNK_SIZE)
         .arrayBuffer()
         .then((chunk) => {
-          if (currentOperation !== operationId) return;
+          if (currentOperation !== operationId || index === null) return;
           index += CHUNK_SIZE;
           postToWorker(e.source,
-            { cmd: "encryptRestOfChunks", chunk, last: index >= file.size },
+            { cmd: "encryptRestOfChunks", chunk, last: index >= currentFile.size },
             [chunk]
           );
         }).catch(() => { if (currentOperation === operationId) handleOperationError(); });
@@ -331,8 +346,8 @@ export default function EncryptionPanel({ active = true }) {
   };
 
   const createShareableLink = async () => {
-    let pk = await computePublicKey(PrivateKey);
-    let link = window.location.origin + "/?tab=decryption&publicKey=" + encodeURIComponent(pk);
+    const pk = await computePublicKey(PrivateKey ?? "");
+    const link = window.location.origin + "/?tab=decryption&publicKey=" + encodeURIComponent(pk);
     setShareableLink(link);
   };
 
@@ -350,10 +365,11 @@ export default function EncryptionPanel({ active = true }) {
   }, []);
 
   useEffect(() => {
-    if (query.tab === "encryption" && query.publicKey) {
+    const queryPublicKey = Array.isArray(query.publicKey) ? query.publicKey[0] : query.publicKey;
+    if (query.tab === "encryption" && queryPublicKey) {
       // eslint-disable-next-line react-hooks/set-state-in-effect -- Apply public-key invitations from the router after hydration, preserving editable credential state.
-      setPublicKey(query.publicKey);
-      publicKey = query.publicKey;
+      setPublicKey(queryPublicKey);
+      publicKey = queryPublicKey;
       setPkAlert(true);
       setEncryptionMethod("publicKey");
       encryptionMethodState = "publicKey";
@@ -361,7 +377,7 @@ export default function EncryptionPanel({ active = true }) {
   }, [query.publicKey, query.tab]);
 
   useEffect(() => {
-    const onMessage = (e) => {
+    const onMessage = (e: MessageEvent) => {
       if (!e.data || (e.data.kind && e.data.kind !== "encryption")) return;
       if (e.data.operationId && e.data.operationId !== operationId &&
           e.data.reply !== "filePreparedEnc") return;
@@ -402,7 +418,7 @@ export default function EncryptionPanel({ active = true }) {
 
         case "filePreparedEnc":
           if (!pendingRequestId || (e.data.requestId && e.data.requestId !== pendingRequestId)) {
-            e.source.postMessage({ cmd: "cancelOperation", operationId: e.data.operationId });
+            (e.source as ServiceWorker | null)?.postMessage({ cmd: "cancelOperation", operationId: e.data.operationId });
             break;
           }
           pendingRequestId = null;

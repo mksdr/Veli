@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, type SyntheticEvent } from "react";
 import { useRouter } from "next/router";
 import { Box, Container, Tab, Tabs, Typography } from "@mui/material";
 import { getTranslations as t } from "../../locales";
@@ -7,7 +7,12 @@ import EncryptionPanel from "./EncryptionPanel";
 import DecryptionPanel from "./DecryptionPanel";
 import LimitedEncryptionPanel from "./limited/LimitedEncryptionPanel";
 import LimitedDecryptionPanel from "./limited/LimitedDecryptionPanel";
-export default function Panels({ buffered = false }) {
+
+export interface PanelsProps {
+  buffered?: boolean;
+}
+
+export default function Panels({ buffered = false }: PanelsProps) {
   const router = useRouter();
   const [value, setValue] = useState(0);
   const { busy } = useWorkflow();
@@ -15,7 +20,7 @@ export default function Panels({ buffered = false }) {
     // eslint-disable-next-line react-hooks/set-state-in-effect -- Synchronize tab state with Next router query changes after hydration and browser navigation.
     setValue(router.query.tab === "decryption" ? 1 : 0);
   }, [router.query.tab]);
-  const change = (event, next) => {
+  const change = (_event: SyntheticEvent, next: number) => {
     if (busy) return;
     setValue(next);
     // Preserve public-key invitations when changing direction.

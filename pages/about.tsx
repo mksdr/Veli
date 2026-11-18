@@ -1,6 +1,7 @@
 /* eslint-disable @next/next/no-html-link-for-pages */
 import fs from "fs";
 import path from "path";
+import type { GetStaticProps } from "next";
 import { marked } from "marked";
 import AppBar from "@mui/material/AppBar";
 import IconButton from "@mui/material/IconButton";
@@ -9,6 +10,7 @@ import Typography from "@mui/material/Typography";
 import Container from "@mui/material/Container";
 import Button from "@mui/material/Button";
 import Box from "@mui/material/Box";
+import type { SxProps, Theme } from "@mui/material/styles";
 import GitHubIcon from "@mui/icons-material/GitHub";
 import Footer from "../src/components/Footer";
 import prism from "prismjs";
@@ -16,10 +18,21 @@ import Settings from "../src/components/Settings";
 import locales from "../locales/locales";
 import { getTranslations as t, useLocale } from "../locales";
 
+export interface DocEntry {
+  lang: string;
+  content: string;
+}
+
+export interface AboutProps {
+  docs: DocEntry[];
+  changelog: string;
+}
+
 marked.setOptions({
-  highlight: function (code, lang) {
-    if (prism.languages[lang]) {
-      return prism.highlight(code, prism.languages[lang], lang);
+  highlight: function (code: string, lang: string) {
+    const grammar = prism.languages[lang];
+    if (grammar) {
+      return prism.highlight(code, grammar, lang);
     } else {
       return code;
     }
@@ -27,7 +40,7 @@ marked.setOptions({
 });
 
 // Explicit pixel lengths preserve the original document layout under sx.
-const contentSx = (theme) => ({
+const contentSx: SxProps<Theme> = (theme) => ({
   padding: theme.spacing(3),
   marginTop: "20px",
 
@@ -150,7 +163,7 @@ const contentSx = (theme) => ({
   },
 });
 
-export default function About(props) {
+export default function About(props: AboutProps) {
   const { locale } = useLocale();
   const docContent = (props.docs.find(doc => doc.lang === locale) || props.docs[0]).content;
 
@@ -213,28 +226,28 @@ export default function About(props) {
   );
 }
 
-export async function getStaticProps() {
+export const getStaticProps: GetStaticProps<AboutProps> = async () => {
   // Get files from the posts dir
 
-  let docs = [];
+  const docs: DocEntry[] = [];
 
   {
-    Object.entries(locales).map(([code, name]) => {
-      let docFilePath = `locales/${code}/docs.md`;
-      let docFile;
+    Object.keys(locales).map((code) => {
+      const docFilePath = `locales/${code}/docs.md`;
+      let docFile: string;
       try {
         docFile = fs.readFileSync(
           path.join(docFilePath),
           "utf-8"
         );
-      } catch (error) {
+      } catch {
         docFile = fs.readFileSync(
           path.join(`locales/en_US/docs.md`),
           "utf-8"
         );
       }
-      
-      let docStructure = { lang: code, content: docFile };
+
+      const docStructure: DocEntry = { lang: code, content: docFile };
       docs.push(docStructure);
     });
   }
@@ -247,4 +260,4 @@ export async function getStaticProps() {
       changelog: changelog,
     },
   };
-}
+};

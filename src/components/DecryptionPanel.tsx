@@ -1,26 +1,35 @@
 import { useState, useEffect } from "react";
 import { useRouter } from "next/router";
 import { useDropzone } from "react-dropzone";
-import FileWorkflow from "./FileWorkflow";
+import FileWorkflow, { type EncryptionMethod } from "./FileWorkflow";
 import { getTranslations as t } from "../../locales";
 import { formatName } from "../helpers/formatName";
 import { CHUNK_SIZE, crypto_secretstream_xchacha20poly1305_ABYTES } from "../config/Constants";
 import { downloadStream } from "../utils/downloadStream";
 
-let file,
-  index,
-  decFileBuff,
-  files = [],
-  password,
+let file: File | null = null,
+  index: number | null = null,
+  decFileBuff: ArrayBuffer | null = null,
+  files: File[] = [],
+  password: string | null | undefined,
   currFile = 0,
-  numberOfFiles,
-  decryptionMethodState,
-  privateKey,
-  publicKey;
+  numberOfFiles = 0,
+  decryptionMethodState: EncryptionMethod | null = null,
+  privateKey: string | null | undefined,
+  publicKey: string | null | undefined;
 
-let operationId, downloadUrl, nextFileTimer, pendingRequestId, releaseDownload;
-const postToWorker = (worker, data, transfer = []) =>
-  worker.postMessage({ ...data, operationId }, transfer);
+let operationId: string | null = null,
+  downloadUrl: string | null = null,
+  nextFileTimer: ReturnType<typeof setTimeout> | undefined,
+  pendingRequestId: string | null = null,
+  releaseDownload: (() => void) | null = null;
+
+const postToWorker = (
+  worker: ServiceWorker | MessagePort | MessageEventSource | null,
+  data: Record<string, unknown>,
+  transfer: Transferable[] = [],
+) => (worker as ServiceWorker).postMessage({ ...data, operationId }, transfer);
+
 const cancelOperation = () => {
   releaseDownload?.();
   releaseDownload = null;
@@ -33,12 +42,16 @@ const cancelOperation = () => {
   downloadUrl = null;
 };
 
-export default function DecryptionPanel({ active = true }) {
+export interface DecryptionPanelProps {
+  active?: boolean;
+}
+
+export default function DecryptionPanel({ active = true }: DecryptionPanelProps) {
 
   const [operationError, setOperationError] = useState(false);
-  const [errorFile, setErrorFile] = useState(null);
+  const [errorFile, setErrorFile] = useState<string | null>(null);
   const handleOperationError = () => {
-    setErrorFile(files[currFile]?.name);
+    setErrorFile(files[currFile]?.name ?? null);
     cancelOperation();
     setOperationError(true);
     resetCurrFile();
@@ -54,17 +67,17 @@ export default function DecryptionPanel({ active = true }) {
 
   const [activeStep, setActiveStep] = useState(0);
 
-  const [Files, setFiles] = useState([]);
+  const [Files, setFiles] = useState<File[]>([]);
 
   const [currFileState, setCurrFileState] = useState(0);
 
-  const [Password, setPassword] = useState();
+  const [Password, setPassword] = useState<string | undefined>();
 
-  const [decryptionMethod, setDecryptionMethod] = useState("secretKey");
+  const [decryptionMethod, setDecryptionMethod] = useState<EncryptionMethod>("secretKey");
 
-  const [PublicKey, setPublicKey] = useState();
+  const [PublicKey, setPublicKey] = useState<string | undefined>();
 
-  const [PrivateKey, setPrivateKey] = useState();
+  const [PrivateKey, setPrivateKey] = useState<string | undefined>();
 
   const [wrongPublicKey, setWrongPublicKey] = useState(false);
 
@@ -72,11 +85,11 @@ export default function DecryptionPanel({ active = true }) {
 
   const [keysError, setKeysError] = useState(false);
 
-  const [keysErrorMessage, setKeysErrorMessage] = useState();
+  const [keysErrorMessage, setKeysErrorMessage] = useState<string | undefined>();
 
-  const [badFile, setbadFile] = useState();
+  const [badFile, setbadFile] = useState<boolean | string>(false);
 
-  const [oldVersion, setOldVersion] = useState();
+  const [oldVersion, setOldVersion] = useState<boolean | string>(false);
 
   const [fileMixUp, setFileMixUp] = useState(false);
 
@@ -127,13 +140,13 @@ export default function DecryptionPanel({ active = true }) {
     password = null;
     setActiveStep(0);
     setFiles([]);
-    setPassword();
+    setPassword(undefined);
     setWrongPassword(false);
     setbadFile(false);
     setOldVersion(false);
     setFileMixUp(false);
-    setPublicKey();
-    setPrivateKey();
+    setPublicKey(undefined);
+    setPrivateKey(undefined);
     // eslint-disable-next-line react-hooks/globals -- This callback updates legacy processing state on user/worker events, never during render.
     privateKey = null;
     // eslint-disable-next-line react-hooks/globals -- This callback updates legacy processing state on user/worker events, never during render.
@@ -172,13 +185,13 @@ export default function DecryptionPanel({ active = true }) {
     decryptionMethodState = null;
   };
 
-  const handleFilesInput = (selectedFiles) => {
+  const handleFilesInput = (selectedFiles: File[]) => {
     selectedFiles = Array.from(selectedFiles);
     if (files.length > 0) {
       files = files.concat(selectedFiles);
       files = files.filter(
-        (thing, index, self) =>
-          index ===
+        (thing, idx, self) =>
+          idx ===
           self.findIndex((t) => t.name === thing.name && t.size === thing.size)
       );
     } else {
@@ -188,19 +201,19 @@ export default function DecryptionPanel({ active = true }) {
     resetFileErrors();
   };
 
-  const updateFilesInput = (index) => {
-    files = [...files.slice(0, index), ...files.slice(index + 1)];
+  const updateFilesInput = (fileIndex: number) => {
+    files = [...files.slice(0, fileIndex), ...files.slice(fileIndex + 1)];
     setFiles(files);
     resetFileErrors();
   };
 
-  const handlePasswordInput = (selectedPassword) => {
+  const handlePasswordInput = (selectedPassword: string) => {
     setPassword(selectedPassword);
     password = selectedPassword;
     setWrongPassword(false);
   };
 
-  const checkFile = (file) => {
+  const checkFile = (targetFile: File) => {
     navigator.serviceWorker.ready.then((reg) => {
       setIsCheckingFile(true);
       setbadFile(false);
@@ -208,8 +221,8 @@ export default function DecryptionPanel({ active = true }) {
       setFileMixUp(false);
 
       Promise.all([
-        file.slice(0, 11).arrayBuffer(), //signatures
-        file.slice(0, 22).arrayBuffer(), //v1 signature
+        targetFile.slice(0, 11).arrayBuffer(), //signatures
+        targetFile.slice(0, 22).arrayBuffer(), //v1 signature
       ]).then(([signature, legacy]) => {
         postToWorker(reg.active, {
           cmd: "checkFile",
@@ -272,17 +285,17 @@ export default function DecryptionPanel({ active = true }) {
     }
   };
 
-  const testDecryption = (file) => {
+  const testDecryption = (targetFile: File) => {
     if (decryptionMethodState === "secretKey") {
       navigator.serviceWorker.ready.then((reg) => {
         setIsTestingPassword(true);
         setWrongPassword(false);
 
         Promise.all([
-          file.slice(0, 11).arrayBuffer(), //signature
-          file.slice(11, 27).arrayBuffer(), //salt
-          file.slice(27, 51).arrayBuffer(), //header
-          file
+          targetFile.slice(0, 11).arrayBuffer(), //signature
+          targetFile.slice(11, 27).arrayBuffer(), //salt
+          targetFile.slice(27, 51).arrayBuffer(), //header
+          targetFile
             .slice(
               51,
               51 + CHUNK_SIZE + crypto_secretstream_xchacha20poly1305_ABYTES
@@ -309,11 +322,11 @@ export default function DecryptionPanel({ active = true }) {
         setWrongPrivateKey(false);
         setWrongPublicKey(false);
 
-        let mode = "test";
+        const mode = "test";
 
         Promise.all([
-          file.slice(11, 35).arrayBuffer(), //header
-          file
+          targetFile.slice(11, 35).arrayBuffer(), //header
+          targetFile
             .slice(
               35,
               35 + CHUNK_SIZE + crypto_secretstream_xchacha20poly1305_ABYTES
@@ -334,19 +347,19 @@ export default function DecryptionPanel({ active = true }) {
     }
   };
 
-  const handlePublicKeyInput = (selectedKey) => {
+  const handlePublicKeyInput = (selectedKey: string) => {
     setPublicKey(selectedKey);
     publicKey = selectedKey;
     setWrongPublicKey(false);
   };
 
-  const handlePrivateKeyInput = (selectedKey) => {
+  const handlePrivateKeyInput = (selectedKey: string) => {
     setPrivateKey(selectedKey);
     privateKey = selectedKey;
     setWrongPrivateKey(false);
   };
 
-  const handleEncryptedFilesDownload = async (e) => {
+  const handleEncryptedFilesDownload = async () => {
     setIsDownloading(true);
     resetCurrFile();
     // eslint-disable-next-line react-hooks/globals -- This callback updates legacy processing state on user/worker events, never during render.
@@ -359,35 +372,36 @@ export default function DecryptionPanel({ active = true }) {
     pendingRequestId = requestId;
     setOperationError(false);
     // send file name to sw
-    let fileName = formatName(files[currFile].name);
+    const fileName = formatName(files[currFile].name);
     navigator.serviceWorker.ready.then((reg) => {
       if (pendingRequestId !== requestId) return;
       postToWorker(reg.active, { cmd: "prepareFileNameDec", fileName, requestId });
     }).catch(handleOperationError);
   };
 
-  const kickOffDecryption = async (e) => {
+  const kickOffDecryption = async () => {
     const currentOperation = operationId;
     if (currFile <= numberOfFiles - 1) {
       file = files[currFile];
+      const currentFile = file;
       releaseDownload?.();
-      releaseDownload = downloadStream(downloadUrl);
+      if (downloadUrl) releaseDownload = downloadStream(downloadUrl);
       setIsDownloading(true);
 
       if (decryptionMethodState === "secretKey") {
         navigator.serviceWorker.ready.then((reg) => {
           if (currentOperation !== operationId) return;
           Promise.all([
-            file.slice(0, 11).arrayBuffer(), //signature
-            file.slice(11, 27).arrayBuffer(), //salt
-            file.slice(27, 51).arrayBuffer(), //header
-            file
+            currentFile.slice(0, 11).arrayBuffer(), //signature
+            currentFile.slice(11, 27).arrayBuffer(), //salt
+            currentFile.slice(27, 51).arrayBuffer(), //header
+            currentFile
               .slice(
                 51,
                 51 + CHUNK_SIZE + crypto_secretstream_xchacha20poly1305_ABYTES
               )
               .arrayBuffer(), //17
-          ]).then(([signature, salt, header, chunk]) => {
+          ]).then(([signature, salt, header]) => {
             if (currentOperation !== operationId) return;
             postToWorker(reg.active, {
               cmd: "requestDecryption",
@@ -403,11 +417,11 @@ export default function DecryptionPanel({ active = true }) {
       if (decryptionMethodState === "publicKey") {
         navigator.serviceWorker.ready.then((reg) => {
           if (currentOperation !== operationId) return;
-          let mode = "derive";
+          const mode = "derive";
 
           Promise.all([
-            file.slice(11, 35).arrayBuffer(), //header
-            file
+            currentFile.slice(11, 35).arrayBuffer(), //header
+            currentFile
               .slice(
                 35,
                 35 + CHUNK_SIZE + crypto_secretstream_xchacha20poly1305_ABYTES
@@ -432,17 +446,16 @@ export default function DecryptionPanel({ active = true }) {
     }
   };
 
-  const startDecryption = (method) => {
+  const startDecryption = (method: EncryptionMethod) => {
     const currentOperation = operationId;
-    let startIndex;
-    if (method === "secretKey") startIndex = 51;
-    if (method === "publicKey") startIndex = 35;
+    const startIndex = method === "secretKey" ? 51 : 35;
 
     file = files[currFile];
+    const currentFile = file;
 
     navigator.serviceWorker.ready.then((reg) => {
-      if (currentOperation !== operationId) return;
-      file
+      if (currentOperation !== operationId || !currentFile) return;
+      currentFile
         .slice(
           startIndex,
           startIndex + CHUNK_SIZE + crypto_secretstream_xchacha20poly1305_ABYTES
@@ -455,30 +468,31 @@ export default function DecryptionPanel({ active = true }) {
             CHUNK_SIZE +
             crypto_secretstream_xchacha20poly1305_ABYTES;
           postToWorker(reg.active,
-            { cmd: "decryptFirstChunk", chunk, last: index >= file.size },
+            { cmd: "decryptFirstChunk", chunk, last: index >= currentFile.size },
             [chunk]
           ); // transfer chunk ArrayBuffer to service worker
         }).catch(() => { if (currentOperation === operationId) handleOperationError(); });
     });
   };
 
-  const continueDecryption = (e) => {
+  const continueDecryption = (e: MessageEvent) => {
     const currentOperation = operationId;
     file = files[currFile];
+    const currentFile = file;
 
-    navigator.serviceWorker.ready.then((reg) => {
-      if (currentOperation !== operationId) return;
-      file
+    navigator.serviceWorker.ready.then(() => {
+      if (currentOperation !== operationId || !currentFile || index === null) return;
+      currentFile
         .slice(
           index,
           index + CHUNK_SIZE + crypto_secretstream_xchacha20poly1305_ABYTES
         )
         .arrayBuffer()
         .then((chunk) => {
-          if (currentOperation !== operationId) return;
+          if (currentOperation !== operationId || index === null) return;
           index += CHUNK_SIZE + crypto_secretstream_xchacha20poly1305_ABYTES;
           postToWorker(e.source,
-            { cmd: "decryptRestOfChunks", chunk, last: index >= file.size },
+            { cmd: "decryptRestOfChunks", chunk, last: index >= currentFile.size },
             [chunk]
           );
         }).catch(() => { if (currentOperation === operationId) handleOperationError(); });
@@ -486,10 +500,11 @@ export default function DecryptionPanel({ active = true }) {
   };
 
   useEffect(() => {
-    if (query.tab === "decryption" && query.publicKey) {
+    const queryPublicKey = Array.isArray(query.publicKey) ? query.publicKey[0] : query.publicKey;
+    if (query.tab === "decryption" && queryPublicKey) {
       // eslint-disable-next-line react-hooks/set-state-in-effect -- Apply public-key invitations from the router after hydration, preserving editable credential state.
-      setPublicKey(query.publicKey);
-      publicKey = query.publicKey;
+      setPublicKey(queryPublicKey);
+      publicKey = queryPublicKey;
       setPkAlert(true);
       setDecryptionMethod("publicKey");
       decryptionMethodState = "publicKey";
@@ -497,7 +512,7 @@ export default function DecryptionPanel({ active = true }) {
   }, [query.publicKey, query.tab]);
 
   useEffect(() => {
-    const onMessage = (e) => {
+    const onMessage = (e: MessageEvent) => {
       if (!e.data || (e.data.kind && e.data.kind !== "decryption")) return;
       if (e.data.operationId && e.data.operationId !== operationId &&
           e.data.reply !== "filePreparedDec") return;
@@ -506,7 +521,7 @@ export default function DecryptionPanel({ active = true }) {
           handleOperationError();
           break;
         case "badFile":
-          setErrorFile(files[currFile]?.name);
+          setErrorFile(files[currFile]?.name ?? null);
           if (numberOfFiles > 1) {
             setbadFile(files[currFile].name);
             setIsCheckingFile(false);
@@ -517,7 +532,7 @@ export default function DecryptionPanel({ active = true }) {
           break;
 
         case "oldVersion":
-          setErrorFile(files[currFile]?.name);
+          setErrorFile(files[currFile]?.name ?? null);
           if (numberOfFiles > 1) {
             setOldVersion(files[currFile].name);
             setIsCheckingFile(false);
@@ -572,21 +587,21 @@ export default function DecryptionPanel({ active = true }) {
           break;
 
         case "wrongDecPrivateKey":
-          setErrorFile(files[currFile]?.name);
+          setErrorFile(files[currFile]?.name ?? null);
           resetCurrFile();
           setWrongPrivateKey(true);
           setIsTestingKeys(false);
           break;
 
         case "wrongDecPublicKey":
-          setErrorFile(files[currFile]?.name);
+          setErrorFile(files[currFile]?.name ?? null);
           resetCurrFile();
           setWrongPublicKey(true);
           setIsTestingKeys(false);
           break;
 
         case "wrongDecKeys":
-          setErrorFile(files[currFile]?.name);
+          setErrorFile(files[currFile]?.name ?? null);
           resetCurrFile();
           setWrongPublicKey(true);
           setWrongPrivateKey(true);
@@ -594,7 +609,7 @@ export default function DecryptionPanel({ active = true }) {
           break;
 
         case "wrongDecKeyPair":
-          setErrorFile(files[currFile]?.name);
+          setErrorFile(files[currFile]?.name ?? null);
           resetCurrFile();
           setKeysError(true);
           setKeysErrorMessage(t("invalid_key_pair"));
@@ -602,7 +617,7 @@ export default function DecryptionPanel({ active = true }) {
           break;
 
         case "wrongDecKeyInput":
-          setErrorFile(files[currFile]?.name);
+          setErrorFile(files[currFile]?.name ?? null);
           resetCurrFile();
           setKeysError(true);
           setKeysErrorMessage(t("invalid_keys_input"));
@@ -610,7 +625,7 @@ export default function DecryptionPanel({ active = true }) {
           break;
 
         case "wrongPassword":
-          setErrorFile(files[currFile]?.name);
+          setErrorFile(files[currFile]?.name ?? null);
           resetCurrFile();
           setWrongPassword(true);
           setIsTestingPassword(false);
@@ -618,7 +633,7 @@ export default function DecryptionPanel({ active = true }) {
 
         case "filePreparedDec":
           if (!pendingRequestId || (e.data.requestId && e.data.requestId !== pendingRequestId)) {
-            e.source.postMessage({ cmd: "cancelOperation", operationId: e.data.operationId });
+            (e.source as ServiceWorker | null)?.postMessage({ cmd: "cancelOperation", operationId: e.data.operationId });
             break;
           }
           pendingRequestId = null;
