@@ -28,7 +28,7 @@ async function buildServiceWorker(options = {}) {
   const projectRoot = path.resolve(__dirname, "..");
 
   const result = await esbuild.build({
-    entryPoints: [path.join(projectRoot, "service-worker/sw.js")],
+    entryPoints: [path.join(projectRoot, "service-worker/sw.ts")],
     outfile: path.join(projectRoot, "public/service-worker.js"),
     bundle: true,
     platform: "browser",

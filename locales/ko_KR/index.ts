@@ -1,4 +1,6 @@
-const ko_KR = {
+import type { Translations } from "../en_US";
+
+const ko_KR: Translations = {
   "file_processing_error": "파일을 처리하지 못했어요. 비밀번호나 키를 확인하고 원본 파일로 다시 시도해주세요. 일부만 다운로드된 파일은 삭제해주세요.",
   "file_hash_limit": "메모리 사용을 줄이기 위해 32 MiB 이하 파일만 해시를 계산해요.",
   "file_info_error": "파일 정보를 읽지 못했어요.",

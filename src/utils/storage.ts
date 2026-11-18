@@ -1,15 +1,13 @@
-const fallback = new Map();
+const fallback = new Map<string, string>();
 
-function getStoredValue(key) {
+export function getStoredValue(key: string): string | null {
   if (typeof window === "undefined") return null;
   try { return window.localStorage.getItem(key) ?? fallback.get(key) ?? null; }
   catch { return fallback.get(key) ?? null; }
 }
 
-function setStoredValue(key, value) {
+export function setStoredValue(key: string, value: unknown): void {
   fallback.set(key, String(value));
   try { window.localStorage.setItem(key, String(value)); }
   catch { /* Preferences still work for this page when storage is blocked. */ }
 }
-
-module.exports = { getStoredValue, setStoredValue };

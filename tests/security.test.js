@@ -4,9 +4,9 @@ const sodium = require("libsodium-wrappers-sumo");
 const { encryptLegacy, decryptLegacy, chunkSize } = require("./helpers/legacyCrypto");
 const { pullChunk } = require("../src/utils/secretstream.ts");
 const { decryptFile } = require("../src/utils/decryptFile.ts");
-const { installWorker } = require("../service-worker/worker");
-const { registerWorker, hasWorkerProtocol } = require("../src/utils/workerSupport");
-const { getStoredValue, setStoredValue } = require("../src/utils/storage");
+const { installWorker } = require("../service-worker/worker.ts");
+const { registerWorker, hasWorkerProtocol } = require("../src/utils/workerSupport.ts");
+const { getStoredValue, setStoredValue } = require("../src/utils/storage.ts");
 
 const config = {
   encoder: new TextEncoder(), decoder: new TextDecoder(),

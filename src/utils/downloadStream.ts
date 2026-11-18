@@ -1,4 +1,4 @@
-function downloadStream(url) {
+export function downloadStream(url: string): () => void {
   // Use a navigation request so Chromium routes it through the service worker.
   // Navigate a separate frame to avoid the main page's beforeunload guard.
   const frame = document.createElement("iframe");
@@ -9,5 +9,3 @@ function downloadStream(url) {
   // cancellation, unmount, or before starting the next download.
   return () => frame.remove();
 }
-
-module.exports = { downloadStream };

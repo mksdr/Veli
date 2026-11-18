@@ -1,4 +1,4 @@
-function downloadBlob(blob, filename) {
+export function downloadBlob(blob: Blob, filename: string): void {
   const url = URL.createObjectURL(blob);
   const link = document.createElement("a");
   link.href = url;
@@ -9,5 +9,3 @@ function downloadBlob(blob, filename) {
   // Give Safari time to consume the URL before releasing the Blob.
   setTimeout(() => URL.revokeObjectURL(url), 30000);
 }
-
-module.exports = { downloadBlob };

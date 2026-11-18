@@ -1,20 +1,23 @@
-const _sodium = require("libsodium-wrappers-sumo");
-const dicewareWordlist = require("../helpers/eef_word_list.json");
-export const generatePassword = async () => {
+import _sodium from "libsodium-wrappers-sumo";
+import dicewareWordlist from "../helpers/eef_word_list.json";
+
+const wordlist: Record<string, string> = dicewareWordlist;
+
+export const generatePassword = async (): Promise<string> => {
   await _sodium.ready;
   const sodium = _sodium;
-  let password = sodium.to_base64(
+  const password = sodium.to_base64(
     sodium.randombytes_buf(16),
     sodium.base64_variants.URLSAFE_NO_PADDING
   );
   return password;
 };
 
-export const generatePassPhrase = async () =>{
+export const generatePassPhrase = async (): Promise<string> => {
   await _sodium.ready;
   const sodium = _sodium;
   const numWords = 5;
-  const passphraseWords = [];
+  const passphraseWords: string[] = [];
 
   for (let i = 0; i < numWords; i++) {
     let diceKey = "";
@@ -25,7 +28,7 @@ export const generatePassPhrase = async () =>{
       diceKey += roll.toString();
     }
 
-    const word = dicewareWordlist[diceKey];
+    const word = wordlist[diceKey];
 
     if (!word) {
       // If key not found, redo this word

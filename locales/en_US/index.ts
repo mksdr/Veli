@@ -267,4 +267,7 @@ const en_US = {
   "page_not_found": "We couldn’t find this page."
 };
 
+export type TranslationKey = keyof typeof en_US;
+export type Translations = Record<TranslationKey, string>;
+
 export default en_US;

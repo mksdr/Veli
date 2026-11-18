@@ -10,4 +10,4 @@ export const SIGNATURES = {
   v1: "Encrypted Using Hat.sh",
   v2_symmetric: "zDKO6XYXioc",
   v2_asymmetric: "hTWKbfoikeg",
-};
+} as const;

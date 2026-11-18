@@ -1,8 +1,13 @@
 import { useEffect, useState } from "react";
 import { registerWorker, hasWorkerProtocol } from "./workerSupport";
 
-export default function useFileProcessingSupport() {
-  const [support, setSupport] = useState({ loading: true, streaming: false });
+export interface FileProcessingSupport {
+  loading: boolean;
+  streaming: boolean;
+}
+
+export default function useFileProcessingSupport(): FileProcessingSupport {
+  const [support, setSupport] = useState<FileProcessingSupport>({ loading: true, streaming: false });
   useEffect(() => {
     let mounted = true;
     const safari = /Safari/.test(navigator.userAgent) && /Apple/.test(navigator.vendor);
