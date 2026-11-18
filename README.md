@@ -139,6 +139,7 @@ leave a partial download; delete it and retry with the original encrypted file.
 ## Verification
 
 ```sh
+npm run typecheck
 npm run lint
 npm run test:release
 npm run test:security
@@ -146,6 +147,12 @@ npm run build
 npx playwright install --with-deps chromium firefox webkit
 npm run test:browser
 ```
+
+JavaScript and TypeScript can coexist during migration. `npm run typecheck`
+generates Next.js types and checks TypeScript files in strict mode; existing
+JavaScript files are not type-checked. Use `.ts` for utilities and `.tsx` for
+React components, and use explicit `.ts` extensions when loading migrated
+utilities directly from Node.js tests or scripts.
 
 The browser suite covers Chromium, Firefox, desktop WebKit, and iPhone/iPad
 WebKit profiles. It compares downloaded plaintext with original bytes and
