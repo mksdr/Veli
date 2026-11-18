@@ -3,7 +3,6 @@ import fs from "fs";
 import path from "path";
 import { marked } from "marked";
 import { useState, useEffect } from "react";
-import PropTypes from "prop-types";
 import AppBar from "@mui/material/AppBar";
 import CssBaseline from "@mui/material/CssBaseline";
 import Divider from "@mui/material/Divider";
@@ -317,14 +316,6 @@ export default function About(props) {
       </div>
   );
 }
-
-About.propTypes = {
-  /**
-   * Injected by the documentation to work in an iframe.
-   * You won't need it on your project.
-   */
-  window: PropTypes.func,
-};
 
 export async function getStaticProps() {
   // Get files from the posts dir
