@@ -1,6 +1,4 @@
-export const formatName = (fileName: string): string => {
-  const trimmed = fileName.replace(/(\s*\(\d+\))?\.enc(\s*\(\d+\))?$/, "$1$2");
-  const clean = trimmed.replace(/\s*\(\d+\)$/, "");
-
-  return clean;
-};
+export const formatName = (fileName: string): string =>
+  fileName
+    .replace(/(\.[^./\\()\s]+)(?:\s*\(\d+\))+(?=\.enc(?:\s*\(\d+\))*$)/, "$1")
+    .replace(/\.enc(?:\s*\(\d+\))*$/, "");

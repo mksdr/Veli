@@ -295,8 +295,10 @@ test("formatName strips only the trailing .enc and numeric duplicate suffixes", 
   assert.equal(formatName("report (2026).pdf.enc"), "report (2026).pdf");
   assert.equal(formatName("report (final).pdf (1).enc"), "report (final).pdf");
   assert.equal(formatName("report (final).pdf.enc (2)"), "report (final).pdf");
-  assert.equal(formatName("Budget (2026).enc"), "Budget");
-  assert.equal(formatName("file.txt (1) (2).enc"), "file.txt (1)");
+  assert.equal(formatName("Budget (2026).enc"), "Budget (2026)");
+  assert.equal(formatName("Budget (2026).enc (1)"), "Budget (2026)");
+  assert.equal(formatName("file.txt (1).enc (2)"), "file.txt");
+  assert.equal(formatName("file.txt (1) (2).enc"), "file.txt");
 });
 
 test("worker rejects missing chunks and credentials instead of coercing undefined buffers", async () => {
