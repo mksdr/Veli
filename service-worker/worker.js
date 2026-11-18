@@ -1,4 +1,4 @@
-const { pullChunk } = require("../src/utils/secretstream");
+const { pullChunk } = require("../src/utils/secretstream.ts");
 
 function installWorker(scope, sodium, config, streamTimeoutMs = 30000) {
   const jobs = new Map();
