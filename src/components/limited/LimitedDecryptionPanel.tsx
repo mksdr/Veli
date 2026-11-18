@@ -41,7 +41,7 @@ const LimitedDecryptionPanel = ({ active = true }: LimitedDecryptionPanelProps) 
 
   const query = router.query;
 
-  const [File, setFile] = useState<File | undefined>();
+  const [selectedFile, setSelectedFile] = useState<File | undefined>();
 
   const [largeFile, setLargeFile] = useState(false);
 
@@ -108,7 +108,7 @@ const LimitedDecryptionPanel = ({ active = true }: LimitedDecryptionPanelProps) 
     setOperationError(false);
     setIsDecrypting(false);
     setActiveStep(0);
-    setFile(undefined);
+    setSelectedFile(undefined);
     setPassword(undefined);
     setWrongPassword(false);
     setbadFile(false);
@@ -125,16 +125,16 @@ const LimitedDecryptionPanel = ({ active = true }: LimitedDecryptionPanelProps) 
     router.replace(router.pathname);
   };
 
-  const handleLimitedFileInput = (selectedFile?: File) => {
-    if (!selectedFile) return;
+  const handleLimitedFileInput = (nextFile?: File) => {
+    if (!nextFile) return;
     setOperationError(false);
-    file = selectedFile;
+    file = nextFile;
 
     if (file.size > MAX_FILE_SIZE) {
       setLargeFile(true);
-      setFile(undefined);
+      setSelectedFile(undefined);
     } else {
-      setFile(selectedFile);
+      setSelectedFile(nextFile);
       setLargeFile(false);
     }
 
@@ -143,20 +143,24 @@ const LimitedDecryptionPanel = ({ active = true }: LimitedDecryptionPanelProps) 
   };
 
   const removeFile = () => {
-    setFile(undefined);
+    setSelectedFile(undefined);
     setbadFile(false);
     setOldVersion(false);
   };
 
   const checkFile = () => {
-    if (!file) return;
+    const targetFile = file ?? selectedFile;
+    if (!targetFile) {
+      handleOperationError();
+      return;
+    }
     setIsCheckingFile(true);
     setbadFile(false);
     setOldVersion(false);
 
     Promise.all([
-      file.slice(0, 11).arrayBuffer(), //signatures
-      file.slice(0, 22).arrayBuffer(), //v1 signature
+      targetFile.slice(0, 11).arrayBuffer(), //signatures
+      targetFile.slice(0, 22).arrayBuffer(), //v1 signature
     ]).then(([signature, legacy]) => {
       if (decoder.decode(signature) === SIGNATURES["v2_symmetric"]) {
         setDecryptionMethod("secretKey");
@@ -216,9 +220,11 @@ const LimitedDecryptionPanel = ({ active = true }: LimitedDecryptionPanelProps) 
             setIsTestingKeys(false);
             setIsTestingPassword(false);
             startLimitedDecryption("publicKey", limitedDecState);
+            return;
           }
         }
       }
+      handleOperationError();
     } catch {
       setKeysError(true);
       setKeysErrorMessage(t("invalid_keys_input"));
@@ -232,12 +238,15 @@ const LimitedDecryptionPanel = ({ active = true }: LimitedDecryptionPanelProps) 
     const sodium = _sodium;
 
     if (decryptionMethod === "secretKey") {
-      if (!File) return;
+      if (!selectedFile || !Password) {
+        handleOperationError();
+        return;
+      }
       setIsTestingPassword(true);
 
       // eslint-disable-next-line react-hooks/globals -- This callback updates legacy processing state on user/worker events, never during render.
-      file = File;
-      const limitedTestPassword = Password ?? "";
+      file = selectedFile;
+      const limitedTestPassword = Password;
 
       Promise.all([
         file.slice(11, 27).arrayBuffer(), //salt
@@ -271,41 +280,51 @@ const LimitedDecryptionPanel = ({ active = true }: LimitedDecryptionPanelProps) 
             decLimitedTestKey
           );
 
-        if (limitedTestState) {
-          const decLimitedTestresults =
-            sodium.crypto_secretstream_xchacha20poly1305_pull(
-              limitedTestState,
-              new Uint8Array(limitedTestDecFileBuff),
-              null
-            );
-          if (decLimitedTestresults) {
-            setIsTestingPassword(false);
+        if (!limitedTestState) {
+          handleOperationError();
+          return;
+        }
+        const decLimitedTestresults =
+          sodium.crypto_secretstream_xchacha20poly1305_pull(
+            limitedTestState,
+            new Uint8Array(limitedTestDecFileBuff),
+            null
+          );
+        if (decLimitedTestresults) {
+          setIsTestingPassword(false);
 
-            return limitedDecKeyGenerator(
-              limitedTestPassword,
-              limitedTestSalt,
-              limitedTestHeader
-            );
-          } else {
-            setIsTestingPassword(false);
-            setWrongPassword(true);
-          }
+          return limitedDecKeyGenerator(
+            limitedTestPassword,
+            limitedTestSalt,
+            limitedTestHeader
+          );
+        } else {
+          setIsTestingPassword(false);
+          setWrongPassword(true);
         }
       }).catch(handleOperationError);
     }
 
     if (decryptionMethod === "publicKey") {
-      if (!File) return;
+      if (!selectedFile) {
+        handleOperationError();
+        return;
+      }
       // requestDecKeyPair()
       setKeysError(false);
       setWrongPrivateKey(false);
       setWrongPublicKey(false);
+      if (!PrivateKey || !PublicKey) {
+        setKeysError(true);
+        setKeysErrorMessage(t("invalid_keys_input"));
+        return;
+      }
       setIsTestingKeys(true);
 
       // eslint-disable-next-line react-hooks/globals -- This callback updates legacy processing state on user/worker events, never during render.
-      file = File;
-      const ssk = PrivateKey ?? "";
-      const cpk = PublicKey ?? "";
+      file = selectedFile;
+      const ssk = PrivateKey;
+      const cpk = PublicKey;
 
       Promise.all([
         file.slice(11, 35).arrayBuffer(), //header
@@ -403,7 +422,7 @@ const LimitedDecryptionPanel = ({ active = true }: LimitedDecryptionPanelProps) 
     const sodium = _sodium;
 
     // eslint-disable-next-line react-hooks/globals -- This callback updates legacy processing state on user/worker events, never during render.
-    file = File;
+    file = selectedFile;
 
     const limitedDecSalt = new Uint8Array(salt);
     const limitedDecHeader = new Uint8Array(header);
@@ -424,9 +443,11 @@ const LimitedDecryptionPanel = ({ active = true }: LimitedDecryptionPanelProps) 
       );
     sodium.memzero(limitedDecKey);
 
-    if (limitedDecState) {
-      return startLimitedDecryption("secretKey", limitedDecState);
+    if (!limitedDecState) {
+      handleOperationError();
+      return;
     }
+    return startLimitedDecryption("secretKey", limitedDecState);
   };
 
   const startLimitedDecryption = async (method: EncryptionMethod, decState: StateAddress) => {
@@ -435,10 +456,10 @@ const LimitedDecryptionPanel = ({ active = true }: LimitedDecryptionPanelProps) 
     // eslint-disable-next-line react-hooks/globals -- This callback updates legacy processing state on user/worker events, never during render.
     limitedDecFileBuff = null;
     try {
-      if (!File) throw new Error("No file selected");
+      if (!selectedFile) throw new Error("No file selected");
       // eslint-disable-next-line react-hooks/globals -- This callback updates legacy processing state on user/worker events, never during render.
       limitedDecFileBuff = await decryptFile(
-        _sodium, File, decState, method === "secretKey" ? 51 : 35, CHUNK_SIZE
+        _sodium, selectedFile, decState, method === "secretKey" ? 51 : 35, CHUNK_SIZE
       );
       handleFinishedDecryption();
     } catch {
@@ -458,10 +479,11 @@ const LimitedDecryptionPanel = ({ active = true }: LimitedDecryptionPanelProps) 
     if (typeof document === "undefined") {
       return;
     }
-    if (!File || !limitedDecFileBuff) {
+    if (!selectedFile || !limitedDecFileBuff) {
+      handleOperationError();
       return;
     }
-    const fileName = formatName(File.name);
+    const fileName = formatName(selectedFile.name);
 
     const blob = new Blob(limitedDecFileBuff as BlobPart[]);
 
@@ -479,7 +501,7 @@ const LimitedDecryptionPanel = ({ active = true }: LimitedDecryptionPanelProps) 
   }, [query.publicKey, query.tab]);
   return <FileWorkflow
     direction="decrypt" active={active} step={activeStep} done={activeStep === 2} buffered
-    files={File ? [File] : []} onFiles={selected => handleLimitedFileInput(selected[0])} onRemove={removeFile} onFileContinue={checkFile}
+    files={selectedFile ? [selectedFile] : []} onFiles={selected => handleLimitedFileInput(selected[0])} onRemove={removeFile} onFileContinue={checkFile}
     method={decryptionMethod} password={Password} onPassword={handlePasswordInput}
     publicKey={PublicKey} privateKey={PrivateKey} onPublicKey={handlePublicKeyInput} onPrivateKey={handlePrivateKeyInput}
     publicKeyError={wrongPublicKey} privateKeyError={wrongPrivateKey} keysError={keysError ? keysErrorMessage : null}

@@ -5,7 +5,7 @@ import { getStoredValue, setStoredValue } from "../src/utils/storage";
 
 export interface LocaleContextValue {
   locale: LocaleCode;
-  changeLocale: (next: string) => void;
+  changeLocale: (next: LocaleCode) => void;
 }
 
 const isLocaleCode = (value: string | null | undefined): value is LocaleCode =>
@@ -23,7 +23,7 @@ export const checkLocale = (): LocaleCode => {
 
 export function LocaleProvider({ children }: { children: ReactNode }) {
   const [locale, setLocale] = useState<LocaleCode>("en_US");
-  const changeLocale = (next: string) => {
+  const changeLocale = (next: LocaleCode) => {
     if (!isLocaleCode(next)) return;
     activeLocale = next;
     document.documentElement.lang = next === "ko_KR" ? "ko" : "en";
@@ -38,11 +38,9 @@ export function LocaleProvider({ children }: { children: ReactNode }) {
 export const useLocale = (): LocaleContextValue => useContext(LocaleContext);
 
 export const getTranslations = (
-  key: TranslationKey | (string & {}),
-  locale: string = activeLocale,
+  key: TranslationKey,
+  locale: LocaleCode | string = activeLocale,
 ): string => {
   const dictionary = isLocaleCode(locale) ? locales[locale] : undefined;
-  return (dictionary as Record<string, string> | undefined)?.[key] ??
-    (en_US as Record<string, string>)[key] ??
-    key;
+  return dictionary?.[key] ?? en_US[key] ?? key;
 };

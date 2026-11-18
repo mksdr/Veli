@@ -98,7 +98,10 @@ export default function FileWorkflow({ direction, active, step, done, buffered =
   const generate = async () => {
     setGenerating(true);
     setGenerateError(false);
-    try { await onGenerate?.(generation); }
+    try {
+      if (!onGenerate) throw new Error("Missing password generator");
+      await onGenerate(generation);
+    }
     catch { setGenerateError(true); }
     finally { setGenerating(false); }
   };
@@ -200,7 +203,7 @@ export default function FileWorkflow({ direction, active, step, done, buffered =
           </>}
           {encrypt && method === "publicKey" && <>
             <Alert severity="info">{t("after_enc_note_one")}</Alert>
-            <Button variant="outlined" disabled={linkPending} onClick={async () => { setLinkPending(true); setLinkError(false); try { await onCreateLink?.(); } catch { setLinkError(true); } finally { setLinkPending(false); } }}>{t("create_shareable_link")}</Button>
+            <Button variant="outlined" disabled={linkPending} onClick={async () => { setLinkPending(true); setLinkError(false); try { if (!onCreateLink) throw new Error("Missing shareable link handler"); await onCreateLink(); } catch { setLinkError(true); } finally { setLinkPending(false); } }}>{t("create_shareable_link")}</Button>
             {linkError && <Alert severity="error">{t("invalid_keys_input")}</Alert>}
             {shareableLink && <><TextField label={t("public_link")} value={shareableLink} InputProps={{ readOnly: true }} fullWidth helperText={t("create_shareable_link_note")} />
               <Box><CopyButton value={shareableLink} label={t("copy_link")} success={t("create_shareable_link_copied")} /></Box></>}

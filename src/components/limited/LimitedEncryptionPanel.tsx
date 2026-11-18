@@ -24,13 +24,25 @@ export interface LimitedEncryptionPanelProps {
 }
 
 const LimitedEncryptionPanel = ({ active = true }: LimitedEncryptionPanelProps) => {
-  useEffect(() => () => { limitedEncFileBuff = null; limitedState = null; file = null; encRx = null; encTx = null; }, []);
+  useEffect(() => () => {
+    limitedEncFileBuff = null;
+    limitedState = null;
+    limitedSalt = null;
+    limitedHeader = null;
+    file = null;
+    encRx = null;
+    encTx = null;
+  }, []);
   const [operationError, setOperationError] = useState(false);
   const handleOperationError = () => {
     // eslint-disable-next-line react-hooks/globals -- This callback updates legacy processing state on user/worker events, never during render.
     limitedEncFileBuff = null;
     // eslint-disable-next-line react-hooks/globals -- This callback updates legacy processing state on user/worker events, never during render.
     limitedState = null;
+    // eslint-disable-next-line react-hooks/globals -- This callback updates legacy processing state on user/worker events, never during render.
+    limitedSalt = null;
+    // eslint-disable-next-line react-hooks/globals -- This callback updates legacy processing state on user/worker events, never during render.
+    limitedHeader = null;
     setIsEncrypting(false);
     setOperationError(true);
   };
@@ -41,7 +53,7 @@ const LimitedEncryptionPanel = ({ active = true }: LimitedEncryptionPanelProps) 
 
   const [activeStep, setActiveStep] = useState(0);
 
-  const [File, setFile] = useState<File | undefined>();
+  const [selectedFile, setSelectedFile] = useState<File | undefined>();
 
   const [largeFile, setLargeFile] = useState(false);
 
@@ -103,8 +115,10 @@ const LimitedEncryptionPanel = ({ active = true }: LimitedEncryptionPanelProps) 
     setOperationError(false);
     limitedKey = null;
     limitedState = null;
+    limitedSalt = null;
+    limitedHeader = null;
     setActiveStep(0);
-    setFile(undefined);
+    setSelectedFile(undefined);
     setPassword(undefined);
     setIsEncrypting(false);
     setPublicKey(undefined);
@@ -146,16 +160,16 @@ const LimitedEncryptionPanel = ({ active = true }: LimitedEncryptionPanelProps) 
     setShortPasswordError(false);
   };
 
-  const handleLimitedFileInput = (selectedFile?: File) => {
-    if (!selectedFile) return;
+  const handleLimitedFileInput = (nextFile?: File) => {
+    if (!nextFile) return;
     setOperationError(false);
-    file = selectedFile;
+    file = nextFile;
 
     if (file.size > MAX_FILE_SIZE) {
       setLargeFile(true);
-      setFile(undefined);
+      setSelectedFile(undefined);
     } else {
-      setFile(selectedFile);
+      setSelectedFile(nextFile);
       setLargeFile(false);
     }
   };
@@ -175,7 +189,12 @@ const LimitedEncryptionPanel = ({ active = true }: LimitedEncryptionPanelProps) 
     setWrongPrivateKey(false);
   };
 
-  const encKeyPair = async (csk = "", spk = "", mode: "test" | "derive") => {
+  const encKeyPair = async (csk: string | undefined, spk: string | undefined, mode: "test" | "derive") => {
+    if (!csk || !spk) {
+      setKeysError(true);
+      setKeysErrorMessage(t("invalid_keys_input"));
+      return;
+    }
     await _sodium.ready;
     const sodium = _sodium;
 
@@ -243,13 +262,21 @@ const LimitedEncryptionPanel = ({ active = true }: LimitedEncryptionPanelProps) 
     try {
       // eslint-disable-next-line react-hooks/globals -- This callback updates legacy processing state on user/worker events, never during render.
       limitedState = null;
+      // eslint-disable-next-line react-hooks/globals -- This callback updates legacy processing state on user/worker events, never during render.
+      limitedSalt = null;
+      // eslint-disable-next-line react-hooks/globals -- This callback updates legacy processing state on user/worker events, never during render.
+      limitedHeader = null;
       if (encryptionMethod === "secretKey") {
-        await limitedEncKeyGenerator(Password ?? "");
+        if (!Password) throw new Error("Missing password");
+        await limitedEncKeyGenerator(Password);
       } else {
+        if (!PrivateKey || !PublicKey) throw new Error("Missing keys");
         await encKeyPair(PrivateKey, PublicKey, "derive");
       }
-      if (!limitedState || !File) throw new Error("Invalid keys");
-      startLimitedEncryption(File);
+      if (!limitedState || !limitedHeader || (encryptionMethod === "secretKey" && !limitedSalt) || !selectedFile) {
+        throw new Error("Invalid keys");
+      }
+      startLimitedEncryption(selectedFile);
     } catch {
       handleOperationError();
     }
@@ -280,6 +307,10 @@ const LimitedEncryptionPanel = ({ active = true }: LimitedEncryptionPanelProps) 
 
   const startLimitedEncryption = (targetFile: File) => {
     if (encryptionMethod === "secretKey") {
+      if (!limitedSalt || !limitedHeader) {
+        handleOperationError();
+        return;
+      }
       const SIGNATURE = new Uint8Array(
         encoder.encode(SIGNATURES["v2_symmetric"])
       );
@@ -288,8 +319,8 @@ const LimitedEncryptionPanel = ({ active = true }: LimitedEncryptionPanelProps) 
       // eslint-disable-next-line react-hooks/globals -- This callback updates legacy processing state on user/worker events, never during render.
       limitedEncFileBuff = []; //clear array
       limitedEncFileBuff.push(SIGNATURE);
-      if (limitedSalt) limitedEncFileBuff.push(limitedSalt);
-      if (limitedHeader) limitedEncFileBuff.push(limitedHeader);
+      limitedEncFileBuff.push(limitedSalt);
+      limitedEncFileBuff.push(limitedHeader);
 
       targetFile
         .slice(0, CHUNK_SIZE)
@@ -302,6 +333,10 @@ const LimitedEncryptionPanel = ({ active = true }: LimitedEncryptionPanelProps) 
     }
 
     if (encryptionMethod === "publicKey") {
+      if (!limitedHeader) {
+        handleOperationError();
+        return;
+      }
       const SIGNATURE = new Uint8Array(
         encoder.encode(SIGNATURES["v2_asymmetric"])
       );
@@ -310,7 +345,7 @@ const LimitedEncryptionPanel = ({ active = true }: LimitedEncryptionPanelProps) 
       // eslint-disable-next-line react-hooks/globals -- This callback updates legacy processing state on user/worker events, never during render.
       limitedEncFileBuff = []; //clear array
       limitedEncFileBuff.push(SIGNATURE);
-      if (limitedHeader) limitedEncFileBuff.push(limitedHeader);
+      limitedEncFileBuff.push(limitedHeader);
 
       targetFile
         .slice(0, CHUNK_SIZE)
@@ -355,7 +390,11 @@ const LimitedEncryptionPanel = ({ active = true }: LimitedEncryptionPanelProps) 
   };
 
   const continueLimitedEncryption = (targetFile: File) => {
-    const startOffset = limitedIndex ?? 0;
+    if (limitedIndex === null) {
+      handleOperationError();
+      return;
+    }
+    const startOffset = limitedIndex;
     targetFile
       .slice(startOffset, startOffset + CHUNK_SIZE)
       .arrayBuffer()
@@ -379,16 +418,18 @@ const LimitedEncryptionPanel = ({ active = true }: LimitedEncryptionPanelProps) 
     if (typeof document === "undefined") {
       return;
     }
-    if (!File || !limitedEncFileBuff) {
+    if (!selectedFile || !limitedEncFileBuff) {
+      handleOperationError();
       return;
     }
-    const fileName = File.name + ".enc";
+    const fileName = selectedFile.name + ".enc";
     const blob = new Blob(limitedEncFileBuff as BlobPart[]);
     downloadBlob(blob, fileName);
   };
 
   const createShareableLink = async () => {
-    const pk = await computePublicKey(PrivateKey ?? "");
+    if (!PrivateKey) throw new Error("Missing private key");
+    const pk = await computePublicKey(PrivateKey);
     const link = window.location.origin + "/?tab=decryption&publicKey=" + encodeURIComponent(pk);
     setShareableLink(link);
   };
@@ -405,7 +446,7 @@ const LimitedEncryptionPanel = ({ active = true }: LimitedEncryptionPanelProps) 
 
   return <FileWorkflow
     direction="encrypt" active={active} step={activeStep} done={activeStep === 3} buffered
-    files={File ? [File] : []} onFiles={selected => handleLimitedFileInput(selected[0])} onRemove={() => setFile(undefined)} onFileContinue={handleNext}
+    files={selectedFile ? [selectedFile] : []} onFiles={selected => handleLimitedFileInput(selected[0])} onRemove={() => setSelectedFile(undefined)} onFileContinue={handleNext}
     method={encryptionMethod} password={Password} onPassword={handlePasswordInput}
     publicKey={PublicKey} privateKey={PrivateKey} onPublicKey={handlePublicKeyInput} onPrivateKey={handlePrivateKeyInput}
     publicKeyError={wrongPublicKey} privateKeyError={wrongPrivateKey} keysError={keysError ? keysErrorMessage : null}

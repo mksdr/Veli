@@ -17,12 +17,30 @@ export interface WorkerFetchEvent {
   respondWith(response: Response | Promise<Response>): void;
 }
 
+export type WorkerCommand =
+  | "getProtocolVersion"
+  | "pingSW"
+  | "prepareFileNameEnc"
+  | "prepareFileNameDec"
+  | "checkFile"
+  | "requestTestDecryption"
+  | "requestEncKeyPair"
+  | "requestDecKeyPair"
+  | "requestEncryption"
+  | "requestDecryption"
+  | "encryptFirstChunk"
+  | "asymmetricEncryptFirstChunk"
+  | "encryptRestOfChunks"
+  | "decryptFirstChunk"
+  | "decryptRestOfChunks"
+  | "cancelOperation";
+
 export interface WorkerMessageData {
-  cmd: string;
+  cmd: WorkerCommand;
   operationId?: string;
   requestId?: string;
   fileName?: unknown;
-  mode?: string;
+  mode?: "test" | "derive";
   password?: string;
   privateKey?: string;
   publicKey?: string;
@@ -219,18 +237,22 @@ export function installWorker(
     let pair: SessionKeys | undefined;
     try {
       if (data.cmd === "requestEncKeyPair") {
-        pair = keyPair(data.privateKey!, data.publicKey!, true);
+        if (!data.privateKey || !data.publicKey) throw new Error("Missing keys");
+        pair = keyPair(data.privateKey, data.publicKey, true);
         reply(client, { reply: "goodKeyPair" });
       } else {
         if (data.cmd === "requestTestDecryption") {
           if (config.decoder.decode(data.signature) !== config.sigCodes.v2_symmetric) throw new Error("Invalid signature");
-          key = derivePassword(data.password!, new Uint8Array(data.salt!));
+          if (typeof data.password !== "string" || !data.salt) throw new Error("Missing credentials");
+          key = derivePassword(data.password, new Uint8Array(data.salt));
         } else {
-          pair = keyPair(data.privateKey!, data.publicKey!, false);
+          if (!data.privateKey || !data.publicKey) throw new Error("Missing keys");
+          pair = keyPair(data.privateKey, data.publicKey, false);
           key = pair.sharedRx;
         }
-        const state = sodium.crypto_secretstream_xchacha20poly1305_init_pull(new Uint8Array(data.header!), key);
-        const result = sodium.crypto_secretstream_xchacha20poly1305_pull(state, new Uint8Array(data.decFileBuff!), null);
+        if (!data.header || !data.decFileBuff) throw new Error("Missing encrypted payload");
+        const state = sodium.crypto_secretstream_xchacha20poly1305_init_pull(new Uint8Array(data.header), key);
+        const result = sodium.crypto_secretstream_xchacha20poly1305_pull(state, new Uint8Array(data.decFileBuff), null);
         reply(client, { reply: result ? "readyToDecrypt"
           : data.cmd === "requestTestDecryption" ? "wrongPassword" : "wrongDecKeys" });
         if (result) erase(result.message);
@@ -249,10 +271,12 @@ export function installWorker(
       if (data.cmd === "requestEncryption" || data.cmd === "requestEncKeyPair") {
         if (job.kind !== "encryption" || job.state) throw new Error("Invalid operation");
         if (data.cmd === "requestEncryption") {
+          if (typeof data.password !== "string") throw new Error("Missing password");
           job.salt = sodium.randombytes_buf(sodium.crypto_pwhash_SALTBYTES);
-          key = derivePassword(data.password!, job.salt);
+          key = derivePassword(data.password, job.salt);
         } else {
-          pair = keyPair(data.privateKey!, data.publicKey!, true);
+          if (!data.privateKey || !data.publicKey) throw new Error("Missing keys");
+          pair = keyPair(data.privateKey, data.publicKey, true);
           key = pair.sharedTx;
         }
         const result = sodium.crypto_secretstream_xchacha20poly1305_init_push(key);
@@ -265,34 +289,39 @@ export function installWorker(
         if (job.kind !== "decryption" || job.state) throw new Error("Invalid operation");
         if (data.cmd === "requestDecryption") {
           if (config.decoder.decode(data.signature) !== config.sigCodes.v2_symmetric) throw new Error("Invalid signature");
-          key = derivePassword(data.password!, new Uint8Array(data.salt!));
+          if (typeof data.password !== "string" || !data.salt) throw new Error("Missing credentials");
+          key = derivePassword(data.password, new Uint8Array(data.salt));
         } else {
-          pair = keyPair(data.privateKey!, data.publicKey!, false);
+          if (!data.privateKey || !data.publicKey) throw new Error("Missing keys");
+          pair = keyPair(data.privateKey, data.publicKey, false);
           key = pair.sharedRx;
         }
-        job.state = sodium.crypto_secretstream_xchacha20poly1305_init_pull(new Uint8Array(data.header!), key);
+        if (!data.header) throw new Error("Missing header");
+        job.state = sodium.crypto_secretstream_xchacha20poly1305_init_pull(new Uint8Array(data.header), key);
         reply(client, { reply: pair ? "decKeyPairGenerated" : "decKeysGenerated" }, job);
         return;
       }
-      if (!job.state || typeof data.last !== "boolean") throw new Error("Invalid operation");
+      if (!job.state || typeof data.last !== "boolean" || !data.chunk) throw new Error("Invalid operation");
       const first = data.cmd.endsWith("FirstChunk");
       if (first === job.started) throw new Error("Invalid chunk order");
       job.started = true;
       if (job.kind === "encryption") {
         if (!["encryptFirstChunk", "asymmetricEncryptFirstChunk", "encryptRestOfChunks"].includes(data.cmd)) throw new Error("Invalid operation");
         if (first) {
+          if (!job.header) throw new Error("Missing header");
           await write(job, config.encoder.encode(job.salt ? config.sigCodes.v2_symmetric : config.sigCodes.v2_asymmetric));
           if (job.salt) await write(job, job.salt);
-          await write(job, job.header!);
+          await write(job, job.header);
         }
         const tag = data.last ? sodium.crypto_secretstream_xchacha20poly1305_TAG_FINAL : sodium.crypto_secretstream_xchacha20poly1305_TAG_MESSAGE;
-        await write(job, sodium.crypto_secretstream_xchacha20poly1305_push(job.state, new Uint8Array(data.chunk!), null, tag));
+        await write(job, sodium.crypto_secretstream_xchacha20poly1305_push(job.state, new Uint8Array(data.chunk), null, tag));
       } else {
         if (!["decryptFirstChunk", "decryptRestOfChunks"].includes(data.cmd)) throw new Error("Invalid operation");
-        await write(job, pullChunk(sodium, job.state, data.chunk!, data.last));
+        await write(job, pullChunk(sodium, job.state, data.chunk, data.last));
       }
       if (data.last) {
-        job.controller!.close();
+        if (!job.controller) throw new Error("Download cancelled");
+        job.controller.close();
         reply(client, { reply: `${job.kind}Finished` }, job);
         release(job);
       } else {

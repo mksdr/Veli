@@ -3,6 +3,11 @@ module.exports = {
   trailingSlash: true,
   output: 'export',
   webpack(config, { isServer, webpack }) {
+    config.resolve.alias = {
+      ...config.resolve.alias,
+      "libsodium-wrappers-sumo": require.resolve("libsodium-wrappers-sumo"),
+      "libsodium-sumo": require.resolve("libsodium-sumo"),
+    };
     if (!isServer) {
       // Sodium 0.8 uses node: imports in its Node-only initialization path.
       // Normalize them so the browser build can apply the empty fallbacks.

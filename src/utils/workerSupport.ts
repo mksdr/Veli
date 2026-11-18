@@ -23,14 +23,17 @@ export async function registerWorker(
   try {
     return await Promise.race([
       (async () => {
-        await navigator.serviceWorker.register!("/service-worker.js");
+        if (!navigator.serviceWorker.register) return false;
+        await navigator.serviceWorker.register("/service-worker.js");
         if (finished) return false;
         if (navigator.serviceWorker.controller) return true;
+        const addEventListener = navigator.serviceWorker.addEventListener;
+        if (!addEventListener) return false;
         return new Promise<boolean>(resolve => {
           onChange = () => {
             if (navigator.serviceWorker.controller) resolve(true);
           };
-          navigator.serviceWorker.addEventListener?.("controllerchange", onChange);
+          addEventListener.call(navigator.serviceWorker, "controllerchange", onChange);
           onChange();
         });
       })(),
@@ -60,7 +63,11 @@ export function hasWorkerProtocol(
     channel.port1.onmessage = (event: MessageEvent<{ version?: number }>) =>
       finish(event.data?.version === 1);
     try {
-      navigator.serviceWorker.controller!.postMessage(
+      if (!navigator.serviceWorker.controller) {
+        finish(false);
+        return;
+      }
+      navigator.serviceWorker.controller.postMessage(
         { cmd: "getProtocolVersion" },
         [channel.port2],
       );

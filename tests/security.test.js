@@ -295,4 +295,17 @@ test("formatName strips only the trailing .enc and numeric duplicate suffixes", 
   assert.equal(formatName("report (2026).pdf.enc"), "report (2026).pdf");
   assert.equal(formatName("report (final).pdf (1).enc"), "report (final).pdf");
   assert.equal(formatName("report (final).pdf.enc (2)"), "report (final).pdf");
+  assert.equal(formatName("Budget (2026).enc"), "Budget");
+  assert.equal(formatName("file.txt (1) (2).enc"), "file.txt (1)");
+});
+
+test("worker rejects missing chunks and credentials instead of coercing undefined buffers", async () => {
+  const h = harness(), client = h.client("missing-payload");
+  const enc = await h.prepare(client);
+  await h.send(client, { cmd: "requestEncryption", password: "test-password-123", operationId: enc.operationId });
+  const body = h.fetch(enc.downloadUrl).arrayBuffer();
+  const rejected = assert.rejects(body);
+  await h.send(client, { cmd: "encryptFirstChunk", last: true, operationId: enc.operationId });
+  await rejected;
+  assert.equal(client.messages.at(-1).reply, "operationError");
 });

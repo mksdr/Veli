@@ -15,11 +15,11 @@ import GitHubIcon from "@mui/icons-material/GitHub";
 import Footer from "../src/components/Footer";
 import prism from "prismjs";
 import Settings from "../src/components/Settings";
-import locales from "../locales/locales";
+import locales, { type LocaleCode } from "../locales/locales";
 import { getTranslations as t, useLocale } from "../locales";
 
 export interface DocEntry {
-  lang: string;
+  lang: LocaleCode;
   content: string;
 }
 
@@ -229,28 +229,23 @@ export default function About(props: AboutProps) {
 export const getStaticProps: GetStaticProps<AboutProps> = async () => {
   // Get files from the posts dir
 
-  const docs: DocEntry[] = [];
+  const docs: DocEntry[] = (Object.keys(locales) as LocaleCode[]).map((code) => {
+    const docFilePath = `locales/${code}/docs.md`;
+    let docFile: string;
+    try {
+      docFile = fs.readFileSync(
+        path.join(docFilePath),
+        "utf-8"
+      );
+    } catch {
+      docFile = fs.readFileSync(
+        path.join(`locales/en_US/docs.md`),
+        "utf-8"
+      );
+    }
 
-  {
-    Object.keys(locales).map((code) => {
-      const docFilePath = `locales/${code}/docs.md`;
-      let docFile: string;
-      try {
-        docFile = fs.readFileSync(
-          path.join(docFilePath),
-          "utf-8"
-        );
-      } catch {
-        docFile = fs.readFileSync(
-          path.join(`locales/en_US/docs.md`),
-          "utf-8"
-        );
-      }
-
-      const docStructure: DocEntry = { lang: code, content: docFile };
-      docs.push(docStructure);
-    });
-  }
+    return { lang: code, content: docFile };
+  });
 
   const changelog = fs.readFileSync("CHANGELOG.md", "utf-8");
 

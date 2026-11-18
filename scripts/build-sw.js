@@ -34,6 +34,10 @@ async function buildServiceWorker(options = {}) {
     platform: "browser",
     format: "iife",
     target: ["es2020"],
+    alias: {
+      "libsodium-wrappers-sumo": require.resolve("libsodium-wrappers-sumo"),
+      "libsodium-sumo": require.resolve("libsodium-sumo"),
+    },
     define: {
       global: "self",
     },

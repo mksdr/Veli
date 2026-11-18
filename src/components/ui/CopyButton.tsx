@@ -17,9 +17,10 @@ export default function CopyButton({ value, label, success, secret = false, disa
   const [pending, setPending] = useState(false);
   const id = useId();
   const copy = async () => {
+    if (!value) return;
     setPending(true);
     try {
-      await navigator.clipboard.writeText(value ?? "");
+      await navigator.clipboard.writeText(value);
       setCopied(true);
     } catch { setFallback(true); }
     finally { setPending(false); }

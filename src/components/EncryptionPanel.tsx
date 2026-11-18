@@ -28,7 +28,12 @@ const postToWorker = (
   worker: ServiceWorker | MessagePort | MessageEventSource | null,
   data: Record<string, unknown>,
   transfer: Transferable[] = [],
-) => (worker as ServiceWorker).postMessage({ ...data, operationId }, transfer);
+) => {
+  if (!worker || !("postMessage" in worker)) {
+    throw new Error("Service worker unavailable");
+  }
+  (worker as ServiceWorker).postMessage({ ...data, operationId }, transfer);
+};
 
 const cancelOperation = () => {
   releaseDownload?.();
@@ -265,8 +270,12 @@ export default function EncryptionPanel({ active = true }: EncryptionPanelProps)
     const currentOperation = operationId;
     if (currFile <= numberOfFiles - 1) {
       file = files[currFile];
+      if (!file || !downloadUrl) {
+        handleOperationError();
+        return;
+      }
       releaseDownload?.();
-      if (downloadUrl) releaseDownload = downloadStream(downloadUrl);
+      releaseDownload = downloadStream(downloadUrl);
       setIsDownloading(true);
 
       if (encryptionMethodState === "publicKey") {
@@ -297,7 +306,11 @@ export default function EncryptionPanel({ active = true }: EncryptionPanelProps)
   const startEncryption = (method: EncryptionMethod) => {
     const currentOperation = operationId;
     navigator.serviceWorker.ready.then((reg) => {
-      if (currentOperation !== operationId || !file) return;
+      if (currentOperation !== operationId) return;
+      if (!file) {
+        handleOperationError();
+        return;
+      }
       const currentFile = file;
       currentFile
         .slice(0, CHUNK_SIZE)
@@ -323,30 +336,39 @@ export default function EncryptionPanel({ active = true }: EncryptionPanelProps)
             );
           }
         }).catch(() => { if (currentOperation === operationId) handleOperationError(); });
-    });
+    }).catch(() => { if (currentOperation === operationId) handleOperationError(); });
   };
 
   const continueEncryption = (e: MessageEvent) => {
     const currentOperation = operationId;
     navigator.serviceWorker.ready.then(() => {
-      if (currentOperation !== operationId || !file || index === null) return;
+      if (currentOperation !== operationId) return;
+      if (!file || index === null) {
+        handleOperationError();
+        return;
+      }
       const currentFile = file;
       currentFile
         .slice(index, index + CHUNK_SIZE)
         .arrayBuffer()
         .then((chunk) => {
-          if (currentOperation !== operationId || index === null) return;
+          if (currentOperation !== operationId) return;
+          if (index === null) {
+            handleOperationError();
+            return;
+          }
           index += CHUNK_SIZE;
           postToWorker(e.source,
             { cmd: "encryptRestOfChunks", chunk, last: index >= currentFile.size },
             [chunk]
           );
         }).catch(() => { if (currentOperation === operationId) handleOperationError(); });
-    });
+    }).catch(() => { if (currentOperation === operationId) handleOperationError(); });
   };
 
   const createShareableLink = async () => {
-    const pk = await computePublicKey(PrivateKey ?? "");
+    if (!PrivateKey) throw new Error("Missing private key");
+    const pk = await computePublicKey(PrivateKey);
     const link = window.location.origin + "/?tab=decryption&publicKey=" + encodeURIComponent(pk);
     setShareableLink(link);
   };
@@ -354,6 +376,7 @@ export default function EncryptionPanel({ active = true }: EncryptionPanelProps)
   useEffect(() => {
     const pingSW = setInterval(() => {
       navigator.serviceWorker.ready.then((reg) => {
+        if (!reg.active) return;
         postToWorker(reg.active, {
           cmd: "pingSW",
         });

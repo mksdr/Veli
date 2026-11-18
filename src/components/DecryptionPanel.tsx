@@ -28,7 +28,12 @@ const postToWorker = (
   worker: ServiceWorker | MessagePort | MessageEventSource | null,
   data: Record<string, unknown>,
   transfer: Transferable[] = [],
-) => (worker as ServiceWorker).postMessage({ ...data, operationId }, transfer);
+) => {
+  if (!worker || !("postMessage" in worker)) {
+    throw new Error("Service worker unavailable");
+  }
+  (worker as ServiceWorker).postMessage({ ...data, operationId }, transfer);
+};
 
 const cancelOperation = () => {
   releaseDownload?.();
@@ -230,7 +235,7 @@ export default function DecryptionPanel({ active = true }: DecryptionPanelProps)
           legacy,
         });
       }).catch(handleOperationError);
-    });
+    }).catch(handleOperationError);
   };
 
   const checkFiles = () => {
@@ -312,7 +317,7 @@ export default function DecryptionPanel({ active = true }: DecryptionPanelProps)
             decFileBuff,
           });
         }).catch(handleOperationError);
-      });
+      }).catch(handleOperationError);
     }
 
     if (decryptionMethodState === "publicKey") {
@@ -343,7 +348,7 @@ export default function DecryptionPanel({ active = true }: DecryptionPanelProps)
             mode,
           });
         }).catch(handleOperationError);
-      });
+      }).catch(handleOperationError);
     }
   };
 
@@ -384,8 +389,12 @@ export default function DecryptionPanel({ active = true }: DecryptionPanelProps)
     if (currFile <= numberOfFiles - 1) {
       file = files[currFile];
       const currentFile = file;
+      if (!currentFile || !downloadUrl) {
+        handleOperationError();
+        return;
+      }
       releaseDownload?.();
-      if (downloadUrl) releaseDownload = downloadStream(downloadUrl);
+      releaseDownload = downloadStream(downloadUrl);
       setIsDownloading(true);
 
       if (decryptionMethodState === "secretKey") {
@@ -454,7 +463,11 @@ export default function DecryptionPanel({ active = true }: DecryptionPanelProps)
     const currentFile = file;
 
     navigator.serviceWorker.ready.then((reg) => {
-      if (currentOperation !== operationId || !currentFile) return;
+      if (currentOperation !== operationId) return;
+      if (!currentFile) {
+        handleOperationError();
+        return;
+      }
       currentFile
         .slice(
           startIndex,
@@ -472,7 +485,7 @@ export default function DecryptionPanel({ active = true }: DecryptionPanelProps)
             [chunk]
           ); // transfer chunk ArrayBuffer to service worker
         }).catch(() => { if (currentOperation === operationId) handleOperationError(); });
-    });
+    }).catch(() => { if (currentOperation === operationId) handleOperationError(); });
   };
 
   const continueDecryption = (e: MessageEvent) => {
@@ -481,7 +494,11 @@ export default function DecryptionPanel({ active = true }: DecryptionPanelProps)
     const currentFile = file;
 
     navigator.serviceWorker.ready.then(() => {
-      if (currentOperation !== operationId || !currentFile || index === null) return;
+      if (currentOperation !== operationId) return;
+      if (!currentFile || index === null) {
+        handleOperationError();
+        return;
+      }
       currentFile
         .slice(
           index,
@@ -489,14 +506,18 @@ export default function DecryptionPanel({ active = true }: DecryptionPanelProps)
         )
         .arrayBuffer()
         .then((chunk) => {
-          if (currentOperation !== operationId || index === null) return;
+          if (currentOperation !== operationId) return;
+          if (index === null) {
+            handleOperationError();
+            return;
+          }
           index += CHUNK_SIZE + crypto_secretstream_xchacha20poly1305_ABYTES;
           postToWorker(e.source,
             { cmd: "decryptRestOfChunks", chunk, last: index >= currentFile.size },
             [chunk]
           );
         }).catch(() => { if (currentOperation === operationId) handleOperationError(); });
-    });
+    }).catch(() => { if (currentOperation === operationId) handleOperationError(); });
   };
 
   useEffect(() => {
