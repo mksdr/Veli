@@ -303,6 +303,22 @@ test("formatName strips only the trailing .enc and numeric duplicate suffixes", 
 
 test("worker rejects missing chunks and credentials instead of coercing undefined buffers", async () => {
   const h = harness(), client = h.client("missing-payload");
+
+  const missingPassword = await h.prepare(client);
+  await h.send(client, { cmd: "requestEncryption", operationId: missingPassword.operationId });
+  assert.equal(client.messages.at(-1).reply, "operationError");
+  assert.equal(h.fetch(missingPassword.downloadUrl).status, 404);
+
+  const missingBuffers = await h.prepare(client, "Dec");
+  await h.send(client, {
+    cmd: "requestDecryption",
+    password: "test-password-123",
+    signature: config.encoder.encode(config.sigCodes.v2_symmetric),
+    operationId: missingBuffers.operationId,
+  });
+  assert.equal(client.messages.at(-1).reply, "operationError");
+  assert.equal(h.fetch(missingBuffers.downloadUrl).status, 404);
+
   const enc = await h.prepare(client);
   await h.send(client, { cmd: "requestEncryption", password: "test-password-123", operationId: enc.operationId });
   const body = h.fetch(enc.downloadUrl).arrayBuffer();
