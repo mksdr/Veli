@@ -309,15 +309,26 @@ test("worker rejects missing chunks and credentials instead of coercing undefine
   assert.equal(client.messages.at(-1).reply, "operationError");
   assert.equal(h.fetch(missingPassword.downloadUrl).status, 404);
 
-  const missingBuffers = await h.prepare(client, "Dec");
+  const missingSalt = await h.prepare(client, "Dec");
   await h.send(client, {
     cmd: "requestDecryption",
     password: "test-password-123",
     signature: config.encoder.encode(config.sigCodes.v2_symmetric),
-    operationId: missingBuffers.operationId,
+    operationId: missingSalt.operationId,
   });
   assert.equal(client.messages.at(-1).reply, "operationError");
-  assert.equal(h.fetch(missingBuffers.downloadUrl).status, 404);
+  assert.equal(h.fetch(missingSalt.downloadUrl).status, 404);
+
+  const missingHeader = await h.prepare(client, "Dec");
+  await h.send(client, {
+    cmd: "requestDecryption",
+    password: "test-password-123",
+    signature: config.encoder.encode(config.sigCodes.v2_symmetric),
+    salt: new Uint8Array(sodium.crypto_pwhash_SALTBYTES),
+    operationId: missingHeader.operationId,
+  });
+  assert.equal(client.messages.at(-1).reply, "operationError");
+  assert.equal(h.fetch(missingHeader.downloadUrl).status, 404);
 
   const enc = await h.prepare(client);
   await h.send(client, { cmd: "requestEncryption", password: "test-password-123", operationId: enc.operationId });
