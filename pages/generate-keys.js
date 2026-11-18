@@ -3,33 +3,24 @@ import Footer from "../src/components/Footer";
 import Hero from "../src/components/Hero";
 import Container from "@mui/material/Container";
 import KeyPairGeneration from "../src/components/KeyPairGeneration";
-import { makeStyles } from "@mui/styles";
-
-const useStyles = makeStyles((theme) => ({
-  page: {
-    backgroundColor: theme.palette.custom?.alabaster?.main,
-    minHeight: "100vh",
-    display: "flex",
-    flexDirection: "column",
-  },
-}));
+import Box from "@mui/material/Box";
 
 const Generate = () => {
-  const classes = useStyles();
   return (
-    <div className={classes.page}>
+    <Box sx={(theme) => ({
+      backgroundColor: theme.palette.custom?.alabaster?.main,
+      minHeight: "100vh",
+      display: "flex",
+      flexDirection: "column",
+    })}>
       <NavAppBar />
       <Hero />
-      <Container
-        style={{
-          maxWidth: "768px",
-        }}
-      >
+      <Container maxWidth={false} sx={{ maxWidth: "768px" }}>
         <KeyPairGeneration opened={true} />
       </Container>
 
       <Footer />
-    </div>
+    </Box>
   );
 };
 
