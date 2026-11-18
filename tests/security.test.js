@@ -7,6 +7,7 @@ const { decryptFile } = require("../src/utils/decryptFile.ts");
 const { installWorker } = require("../service-worker/worker.ts");
 const { registerWorker, hasWorkerProtocol } = require("../src/utils/workerSupport.ts");
 const { getStoredValue, setStoredValue } = require("../src/utils/storage.ts");
+const { formatName } = require("../src/helpers/formatName.ts");
 
 const config = {
   encoder: new TextEncoder(), decoder: new TextDecoder(),
@@ -284,4 +285,14 @@ test("download setup echoes its request token and can be cancelled before fetchi
   assert.equal(prepared.reply, "filePreparedEnc");
   await h.send(client, { cmd: "cancelOperation", operationId: prepared.operationId });
   assert.equal(h.fetch(prepared.downloadUrl).status, 404);
+});
+
+test("formatName strips only the trailing .enc and numeric duplicate suffixes", () => {
+  assert.equal(formatName("document.txt.enc"), "document.txt");
+  assert.equal(formatName("archive.enc.tar.gz.enc"), "archive.enc.tar.gz");
+  assert.equal(formatName("archive.enc.tar.gz"), "archive.enc.tar.gz");
+  assert.equal(formatName("report (final).pdf.enc"), "report (final).pdf");
+  assert.equal(formatName("report (2026).pdf.enc"), "report (2026).pdf");
+  assert.equal(formatName("report (final).pdf (1).enc"), "report (final).pdf");
+  assert.equal(formatName("report (final).pdf.enc (2)"), "report (final).pdf");
 });

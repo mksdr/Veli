@@ -1,8 +1,6 @@
 export const formatName = (fileName: string): string => {
-  //remove .enc
-  const trimmed = fileName.replace(".enc", "");
-  //remove parenthesis
-  const clean = trimmed.replace(/ *\([^)]*\) */g, "");
+  const trimmed = fileName.replace(/(\s*\(\d+\))?\.enc(\s*\(\d+\))?$/, "$1$2");
+  const clean = trimmed.replace(/\s*\(\d+\)$/, "");
 
   return clean;
 };
