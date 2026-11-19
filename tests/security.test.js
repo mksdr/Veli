@@ -4,9 +4,10 @@ const sodium = require("libsodium-wrappers-sumo");
 const { encryptLegacy, decryptLegacy, chunkSize } = require("./helpers/legacyCrypto");
 const { pullChunk } = require("../src/utils/secretstream.ts");
 const { decryptFile } = require("../src/utils/decryptFile.ts");
-const { installWorker } = require("../service-worker/worker");
-const { registerWorker, hasWorkerProtocol } = require("../src/utils/workerSupport");
-const { getStoredValue, setStoredValue } = require("../src/utils/storage");
+const { installWorker } = require("../service-worker/worker.ts");
+const { registerWorker, hasWorkerProtocol } = require("../src/utils/workerSupport.ts");
+const { getStoredValue, setStoredValue } = require("../src/utils/storage.ts");
+const { formatName } = require("../src/helpers/formatName.ts");
 
 const config = {
   encoder: new TextEncoder(), decoder: new TextDecoder(),
@@ -284,4 +285,56 @@ test("download setup echoes its request token and can be cancelled before fetchi
   assert.equal(prepared.reply, "filePreparedEnc");
   await h.send(client, { cmd: "cancelOperation", operationId: prepared.operationId });
   assert.equal(h.fetch(prepared.downloadUrl).status, 404);
+});
+
+test("formatName strips only the trailing .enc and numeric duplicate suffixes", () => {
+  assert.equal(formatName("document.txt.enc"), "document.txt");
+  assert.equal(formatName("archive.enc.tar.gz.enc"), "archive.enc.tar.gz");
+  assert.equal(formatName("archive.enc.tar.gz"), "archive.enc.tar.gz");
+  assert.equal(formatName("report (final).pdf.enc"), "report (final).pdf");
+  assert.equal(formatName("report (2026).pdf.enc"), "report (2026).pdf");
+  assert.equal(formatName("report (final).pdf (1).enc"), "report (final).pdf");
+  assert.equal(formatName("report (final).pdf.enc (2)"), "report (final).pdf");
+  assert.equal(formatName("Budget (2026).enc"), "Budget (2026)");
+  assert.equal(formatName("Budget (2026).enc (1)"), "Budget (2026)");
+  assert.equal(formatName("file.txt (1).enc (2)"), "file.txt");
+  assert.equal(formatName("file.txt (1) (2).enc"), "file.txt");
+});
+
+test("worker rejects missing chunks and credentials instead of coercing undefined buffers", async () => {
+  const h = harness(), client = h.client("missing-payload");
+
+  const missingPassword = await h.prepare(client);
+  await h.send(client, { cmd: "requestEncryption", operationId: missingPassword.operationId });
+  assert.equal(client.messages.at(-1).reply, "operationError");
+  assert.equal(h.fetch(missingPassword.downloadUrl).status, 404);
+
+  const missingSalt = await h.prepare(client, "Dec");
+  await h.send(client, {
+    cmd: "requestDecryption",
+    password: "test-password-123",
+    signature: config.encoder.encode(config.sigCodes.v2_symmetric),
+    operationId: missingSalt.operationId,
+  });
+  assert.equal(client.messages.at(-1).reply, "operationError");
+  assert.equal(h.fetch(missingSalt.downloadUrl).status, 404);
+
+  const missingHeader = await h.prepare(client, "Dec");
+  await h.send(client, {
+    cmd: "requestDecryption",
+    password: "test-password-123",
+    signature: config.encoder.encode(config.sigCodes.v2_symmetric),
+    salt: new Uint8Array(sodium.crypto_pwhash_SALTBYTES),
+    operationId: missingHeader.operationId,
+  });
+  assert.equal(client.messages.at(-1).reply, "operationError");
+  assert.equal(h.fetch(missingHeader.downloadUrl).status, 404);
+
+  const enc = await h.prepare(client);
+  await h.send(client, { cmd: "requestEncryption", password: "test-password-123", operationId: enc.operationId });
+  const body = h.fetch(enc.downloadUrl).arrayBuffer();
+  const rejected = assert.rejects(body);
+  await h.send(client, { cmd: "encryptFirstChunk", last: true, operationId: enc.operationId });
+  await rejected;
+  assert.equal(client.messages.at(-1).reply, "operationError");
 });

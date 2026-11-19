@@ -1,3 +1,4 @@
+const { createRequire } = require("node:module");
 const esbuild = require("esbuild");
 const path = require("path");
 
@@ -26,14 +27,19 @@ async function buildServiceWorker(options = {}) {
     (process.argv.includes("--sourcemap") || process.env.SOURCEMAP === "true");
 
   const projectRoot = path.resolve(__dirname, "..");
+  const sodiumWrapper = require.resolve("libsodium-wrappers-sumo");
 
   const result = await esbuild.build({
-    entryPoints: [path.join(projectRoot, "service-worker/sw.js")],
+    entryPoints: [path.join(projectRoot, "service-worker/sw.ts")],
     outfile: path.join(projectRoot, "public/service-worker.js"),
     bundle: true,
     platform: "browser",
     format: "iife",
     target: ["es2020"],
+    alias: {
+      "libsodium-wrappers-sumo": sodiumWrapper,
+      "libsodium-sumo": createRequire(sodiumWrapper).resolve("libsodium-sumo"),
+    },
     define: {
       global: "self",
     },
