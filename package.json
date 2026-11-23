@@ -22,7 +22,7 @@
     "@mui/material": "^5.18.0",
     "@zxcvbn-ts/core": "^3.0.4",
     "@zxcvbn-ts/language-common": "^4.2.0",
-    "@zxcvbn-ts/language-en": "^3.0.2",
+    "@zxcvbn-ts/language-en": "^4.1.2",
     "libsodium-wrappers-sumo": "^0.8.4",
     "marked": "4.3.0",
     "next": "16.4.6",
