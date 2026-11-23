@@ -70,6 +70,7 @@ const ko_KR: Translations = {
   "offline_note": "파일은 이 브라우저에서 처리하며 서버에 업로드하지 않아요.",
   "very_weak": "매우 약해요",
   "weak": "약해요",
+  "password_strength_hint": "길이뿐 아니라 흔한 비밀번호와 패턴도 평가해요. 숫자를 덧붙여도 쉽게 추측될 수 있으니, 관련 없는 여러 단어를 조합하거나 아래에서 비밀번호를 만들어보세요.",
   "moderate": "적절해요",
   "good": "좋아요",
   "strong": "강해요",

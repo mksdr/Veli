@@ -207,8 +207,8 @@ test("Korean password flow downloads the original plaintext after decryption", a
 });
 
 for (const locale of [
-  { code: "en_US", weak: "Password strength: Very Weak (guessable)", strong: "Password strength: Strong" },
-  { code: "ko_KR", weak: "비밀번호 강도: 매우 약해요", strong: "비밀번호 강도: 강해요" },
+  { code: "en_US", weak: "Password strength: Weak", strong: "Password strength: Strong" },
+  { code: "ko_KR", weak: "비밀번호 강도: 약해요", strong: "비밀번호 강도: 강해요" },
 ]) {
   test("password strength recognizes weak patterns and strong passwords in " + locale.code, async ({ page }) => {
     const errors = [];
