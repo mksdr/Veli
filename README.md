@@ -164,3 +164,26 @@ physical iOS Safari testing.
 Veli is licensed under the [MIT License](LICENSE). Original copyright notices
 for sh-dv and contributors and mrtechtroid remain in the license, alongside
 the copyright notice for Veli contributions by mksdr.
+
+## Offline use and installation
+
+Open Veli once over HTTPS (or localhost) and wait for **Ready for offline use**.
+This automatically saves the encryption, decryption, embedded `/headless/`, and
+key-generation pages, including both interface languages and local fonts. You
+can then disconnect and reopen or refresh those pages. Files, passwords, private
+keys, and download results are never saved in the offline app cache.
+
+Use your browser’s **Install app** option, or **Add to Home Screen** in Safari,
+to open Veli as a standalone app. Installation is optional for offline use.
+Safari and mobile browsers retain their existing one-file, up-to-1-GiB buffered
+processing limit; available memory may require smaller files.
+
+Help at `/about/` requires a connection. Its link is disabled offline, and direct
+offline navigation shows a short notice with a link home.
+
+Updates prepare in the background and take effect after all Veli tabs/windows
+close. There is no forced reload during file processing. If offline preparation
+fails, reconnect and reopen Veli to retry. Clearing site data, browser storage
+eviction, or private browsing restrictions can remove or prevent offline
+availability; reconnect and wait for preparation again. Offline caching is
+only enabled in production builds (`npm run build`), not `npm run dev`.

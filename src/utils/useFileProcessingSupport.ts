@@ -1,5 +1,7 @@
 import { useEffect, useState } from "react";
-import { registerWorker, hasWorkerProtocol } from "./workerSupport";
+import { waitForWorkerControl, hasWorkerProtocol } from "./workerSupport";
+
+import { registerAppWorker } from "./appWorker";
 
 export interface FileProcessingSupport {
   loading: boolean;
@@ -15,7 +17,7 @@ export default function useFileProcessingSupport(): FileProcessingSupport {
     const canStream = !safari && !mobile && window.isSecureContext &&
       "serviceWorker" in navigator && typeof ReadableStream !== "undefined";
     (async () => {
-      const streaming = canStream && await registerWorker(navigator) &&
+      const streaming = canStream && await waitForWorkerControl(navigator, 5000, registerAppWorker) &&
         await hasWorkerProtocol(navigator);
       if (mounted) setSupport({ loading: false, streaming });
     })();

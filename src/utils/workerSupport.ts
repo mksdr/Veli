@@ -13,9 +13,17 @@ export interface WorkerNavigatorLike {
   serviceWorker: ServiceWorkerContainerLike;
 }
 
-export async function registerWorker(
+export async function registerWorker(navigator: WorkerNavigatorLike, timeoutMs = 5000): Promise<boolean> {
+  return waitForWorkerControl(navigator, timeoutMs, async () => {
+    if (!navigator.serviceWorker.register) throw new Error("Service workers unavailable");
+    await navigator.serviceWorker.register("/service-worker.js");
+  });
+}
+
+export async function waitForWorkerControl(
   navigator: WorkerNavigatorLike,
   timeoutMs = 5000,
+  register: () => Promise<unknown> = async () => {},
 ): Promise<boolean> {
   let timer: ReturnType<typeof setTimeout> | undefined;
   let onChange: (() => void) | undefined;
@@ -23,8 +31,7 @@ export async function registerWorker(
   try {
     return await Promise.race([
       (async () => {
-        if (!navigator.serviceWorker.register) return false;
-        await navigator.serviceWorker.register("/service-worker.js");
+        await register();
         if (finished) return false;
         if (navigator.serviceWorker.controller) return true;
         const addEventListener = navigator.serviceWorker.addEventListener;

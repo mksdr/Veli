@@ -1,4 +1,9 @@
 const en_US = {
+  "pwa_preparing": "Preparing for offline use…",
+  "pwa_ready": "Ready for offline use",
+  "pwa_unavailable": "Offline use is unavailable. Connect and reopen Veli to try again.",
+  "pwa_about_online": "Help requires an internet connection.",
+
   "file_processing_error": "File processing failed. Check the password or keys and try again with the original file. Delete any incomplete download before retrying.",
   "file_hash_limit": "Hashes are calculated only for files up to 32 MiB to limit memory use.",
   "file_info_error": "Could not read file information.",
