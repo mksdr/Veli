@@ -16,8 +16,17 @@ async function staticServer({ redirectHtml = false } = {}) {
         response.writeHead(308, { Location: destination + url.search }).end();
         return;
       }
-      const pathname = redirectHtml && !path.extname(url.pathname) && !url.pathname.endsWith('/')
-        ? url.pathname + '.html' : url.pathname;
+      let pathname = url.pathname;
+      if (redirectHtml && !path.extname(pathname) && !pathname.endsWith('/')) {
+        const directory = path.resolve(root, '.' + pathname);
+        if (!directory.startsWith(root + path.sep)) throw new Error('Invalid path');
+        if ((await fs.stat(directory).catch(() => null))?.isDirectory()) {
+          response.writeHead(308, { Location: pathname + '/' + url.search }).end();
+          return;
+        }
+        // Standalone exports such as offline.html use extensionless URLs too.
+        pathname += '.html';
+      }
       const file = path.resolve(root, '.' + pathname + (pathname.endsWith('/') ? 'index.html' : ''));
       if (!file.startsWith(root + path.sep)) throw new Error('Invalid path');
       const types = { '.html': 'text/html', '.js': 'text/javascript', '.css': 'text/css', '.svg': 'image/svg+xml', '.webmanifest': 'application/manifest+json', '.woff': 'font/woff', '.woff2': 'font/woff2', '.png': 'image/png' };
