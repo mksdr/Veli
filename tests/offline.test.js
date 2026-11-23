@@ -19,7 +19,15 @@ function harness(version = 'new', failInstall = false) {
           }
         },
         async keys() { return [...data.keys()].map(url => new Request('https://veli.test' + url)); },
-        async match(key) { return data.get(key)?.clone(); },
+        async match(key) {
+          const original = data.get(key);
+          if (!original) return;
+          const copy = original.clone();
+          // CacheStorage preserves redirect history, unlike Response.clone in
+          // this lightweight test double with synthetic metadata.
+          Object.defineProperty(copy, 'redirected', { value: original.redirected });
+          return copy;
+        },
       };
     },
     async keys() { return [...stores.keys()]; },
@@ -74,4 +82,22 @@ test('development builds install no offline event handlers', () => {
   let count = 0;
   installOffline({ addEventListener() { count++; } }, [], 'development');
   assert.equal(count, 0);
+});
+
+test('cached redirected HTML is returned without redirect history or lost headers/body', async () => {
+  const h = harness();
+  const cached = new Response('redirected HTML', { headers: { 'Content-Type': 'text/html; charset=utf-8', 'X-Test': 'preserved' } });
+  Object.defineProperty(cached, 'redirected', { value: true });
+  h.stores.set('veli-offline-new', new Map([['/index.html', cached]]));
+  let pending;
+  h.handlers.fetch({
+    request: { url: 'https://veli.test/?tab=decryption', method: 'GET', mode: 'navigate' },
+    respondWith(value) { pending = value; },
+  });
+  const response = await pending;
+  assert.equal(response.redirected, false);
+  assert.equal(response.status, 200);
+  assert.equal(response.headers.get('X-Test'), 'preserved');
+  assert.equal(response.headers.get('Content-Type'), 'text/html; charset=utf-8');
+  assert.equal(await response.text(), 'redirected HTML');
 });

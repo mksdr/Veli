@@ -9,7 +9,7 @@ const { contents, encrypt, decrypt, plaintext } = require('../helpers/browserFil
 // Firefox automation's ephemeral profiles bypass worker control on navigation.
 const test = base.extend({
   offlineServer: async ({}, provide) => {
-    const server = await staticServer();
+    const server = await staticServer({ redirectHtml: true });
     try { await provide(server); }
     finally { await server.close(); }
   },
@@ -54,6 +54,11 @@ test('prepares unvisited pages, reloads offline, and keeps About online only', a
     }
     return paths;
   });
+  // Model Pages hosting: these cache entries came from followed HTML redirects.
+  expect(await page.evaluate(async () => {
+    const name = (await caches.keys()).find(key => key.startsWith('veli-offline-'));
+    return (await (await caches.open(name)).match('/index.html')).redirected;
+  })).toBe(true);
   expect(cachePaths).toEqual(expect.arrayContaining(['/index.html', '/headless/index.html', '/generate-keys/index.html']));
   expect(cachePaths.some(url => /about|\/file(?:\?|$)/.test(url))).toBe(false);
   await disconnect(context, offlineServer);

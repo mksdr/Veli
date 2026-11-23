@@ -9,6 +9,15 @@ const pages: Record<string, string> = {
   "/generate-keys/": "/generate-keys/index.html",
 };
 
+// Pages hosts may redirect /index.html to / (and /offline.html to /offline).
+// Safari rejects a response with that redirect history for navigation requests
+// whose redirect mode is manual. Rewrap only the final body, without buffering.
+function withoutRedirectHistory(response: Response): Response {
+  return response.redirected
+    ? new Response(response.body, { status: response.status, statusText: response.statusText, headers: response.headers })
+    : response;
+}
+
 export function installOffline(scope: ServiceWorkerGlobalScope, precache: string[], version: string): void {
   if (!precache.length) return;
   const cacheName = prefix + version;
@@ -45,7 +54,7 @@ export function installOffline(scope: ServiceWorkerGlobalScope, precache: string
     if (url.origin !== scope.location.origin || event.request.method !== "GET" || url.pathname === "/file") return;
     if (event.request.mode === "navigate" && /^\/about\/?$/.test(url.pathname)) {
       event.respondWith(fetch(new Request(event.request, { cache: "no-store" })).catch(async () =>
-        (await caches.open(cacheName)).match("/offline.html").then(response => response ?? Response.error())));
+        (await caches.open(cacheName)).match("/offline.html").then(response => response ?? Response.error())).then(withoutRedirectHistory));
       return;
     }
     const key = event.request.mode === "navigate" ? pages[url.pathname] : url.pathname;
@@ -53,7 +62,7 @@ export function installOffline(scope: ServiceWorkerGlobalScope, precache: string
     event.respondWith((async () => {
       const cached = await (await caches.open(cacheName)).match(key);
       // Never cache arbitrary runtime requests, including credentials or downloads.
-      return cached ?? fetch(event.request);
+      return withoutRedirectHistory(cached ?? await fetch(event.request));
     })());
   });
 }

@@ -2,7 +2,7 @@ const { createServer } = require('node:http');
 const fs = require('node:fs/promises');
 const path = require('node:path');
 
-async function staticServer() {
+async function staticServer({ redirectHtml = false } = {}) {
   const root = path.resolve('out');
   let connected = true;
   let worker;
@@ -10,7 +10,15 @@ async function staticServer() {
     if (!connected) { request.socket.destroy(); return; }
     try {
       const url = new URL(request.url, 'http://localhost');
-      const file = path.resolve(root, '.' + url.pathname + (url.pathname.endsWith('/') ? 'index.html' : ''));
+      if (redirectHtml && url.pathname.endsWith('.html')) {
+        const destination = url.pathname.endsWith('/index.html')
+          ? url.pathname.slice(0, -'index.html'.length) : url.pathname.slice(0, -'.html'.length);
+        response.writeHead(308, { Location: destination + url.search }).end();
+        return;
+      }
+      const pathname = redirectHtml && !path.extname(url.pathname) && !url.pathname.endsWith('/')
+        ? url.pathname + '.html' : url.pathname;
+      const file = path.resolve(root, '.' + pathname + (pathname.endsWith('/') ? 'index.html' : ''));
       if (!file.startsWith(root + path.sep)) throw new Error('Invalid path');
       const types = { '.html': 'text/html', '.js': 'text/javascript', '.css': 'text/css', '.svg': 'image/svg+xml', '.webmanifest': 'application/manifest+json', '.woff': 'font/woff', '.woff2': 'font/woff2', '.png': 'image/png' };
       response.setHeader('Content-Type', types[path.extname(file)] ?? 'application/octet-stream');
