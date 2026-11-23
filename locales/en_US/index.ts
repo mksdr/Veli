@@ -68,6 +68,7 @@ const en_US = {
   "offline_note": "Your files stay in this browser. They are not uploaded to a server.",
   "very_weak": "Very Weak (guessable)",
   "weak": "Weak",
+  "password_strength_hint": "Strength depends on common passwords and patterns as well as length. Adding numbers can still leave a password easy to guess. Combine several unrelated words or create a password below.",
   "moderate": "Moderate",
   "good": "Good",
   "strong": "Strong",
