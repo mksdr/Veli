@@ -45,6 +45,8 @@ const display_time = (seconds: number): string => {
 };
 
 const options = {
+  // The password field is uncapped; preserve v3's full-input synchronous scoring.
+  maxLength: Infinity,
   translations: zxcvbnEnPackage.translations,
   dictionary: {
     ...zxcvbnCommonPackage.dictionary,

@@ -61,6 +61,15 @@ for (const path of ["/", "/headless/"]) {
         await input.fill(password);
         await expect(strength).toHaveText(`${text.strength}: ${label}`);
       }
+
+      // Score the suffix too: the password field accepts more than 256 UTF-16 code units.
+      await input.fill("a".repeat(256));
+      await expect(strength).toHaveText(`${text.strength}: ${text.weak}`);
+      for (const password of ["a".repeat(256) + "mN7!qT9@vL2#", "a".repeat(255) + "🔐mN7!qT9@vL2#"]) {
+        await input.fill(password);
+        await expect(input).toHaveValue(password);
+        await expect(strength).toHaveText(`${text.strength}: ${text.strong}`);
+      }
       await expect(hint).toBeVisible();
       await input.fill("");
       await expect(strength).toHaveCount(0);
