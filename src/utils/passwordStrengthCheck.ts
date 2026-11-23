@@ -1,7 +1,7 @@
 import { getTranslations as t } from "../../locales";
 import type { TranslationKey } from "../../locales/en_US";
 
-import { zxcvbn, zxcvbnOptions, type Score } from "@zxcvbn-ts/core";
+import { ZxcvbnFactory, type Score } from "@zxcvbn-ts/core";
 import * as zxcvbnCommonPackage from "@zxcvbn-ts/language-common";
 import * as zxcvbnEnPackage from "@zxcvbn-ts/language-en";
 
@@ -52,12 +52,12 @@ const options = {
   },
   graphs: zxcvbnCommonPackage.adjacencyGraphs,
 };
-zxcvbnOptions.setOptions(options);
+const zxcvbn = new ZxcvbnFactory(options);
 
 const passwordStrengthCheck = (password: string): [string, string] => {
-  const strengthResult = zxcvbn(password);
+  const strengthResult = zxcvbn.check(password);
   const score = strengthResult.score;
-  const crackTimeInSeconds = strengthResult.crackTimesSeconds.offlineSlowHashing1e4PerSecond;
+  const crackTimeInSeconds = strengthResult.crackTimes.offlineSlowHashingXPerSecond.seconds;
   const crackTime = display_time(crackTimeInSeconds);
 
   return [t(strength[score]), crackTime];
