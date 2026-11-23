@@ -31,7 +31,9 @@ export async function waitForWorkerControl(
   try {
     return await Promise.race([
       (async () => {
-        await register();
+        // registerAppWorker fulfills with null when registration is unavailable.
+        // Do not wait for a controller that cannot arrive in this case.
+        if (await register() === null) return false;
         if (finished) return false;
         if (navigator.serviceWorker.controller) return true;
         const addEventListener = navigator.serviceWorker.addEventListener;

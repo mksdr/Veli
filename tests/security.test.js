@@ -5,7 +5,7 @@ const { encryptLegacy, decryptLegacy, chunkSize } = require("./helpers/legacyCry
 const { pullChunk } = require("../src/utils/secretstream.ts");
 const { decryptFile } = require("../src/utils/decryptFile.ts");
 const { installWorker } = require("../service-worker/worker.ts");
-const { registerWorker, hasWorkerProtocol } = require("../src/utils/workerSupport.ts");
+const { registerWorker, waitForWorkerControl, hasWorkerProtocol } = require("../src/utils/workerSupport.ts");
 const { getStoredValue, setStoredValue } = require("../src/utils/storage.ts");
 const { formatName } = require("../src/helpers/formatName.ts");
 
@@ -337,4 +337,17 @@ test("worker rejects missing chunks and credentials instead of coercing undefine
   await h.send(client, { cmd: "encryptFirstChunk", last: true, operationId: enc.operationId });
   await rejected;
   assert.equal(client.messages.at(-1).reply, "operationError");
+});
+
+test("a fulfilled null registration falls back before the next event-loop turn", async () => {
+  let listeners = 0;
+  const result = await Promise.race([
+    waitForWorkerControl({ serviceWorker: {
+      controller: null,
+      addEventListener() { listeners++; },
+    } }, 1000, async () => null),
+    new Promise(resolve => setImmediate(() => resolve("still waiting"))),
+  ]);
+  assert.equal(result, false);
+  assert.equal(listeners, 0);
 });

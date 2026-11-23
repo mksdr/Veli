@@ -266,3 +266,18 @@ test("about page blockquotes are styled for light mode", async ({ page }) => {
   expect(lightBorderLeft).toBe("rgb(200, 204, 208)");
 });
 
+
+test("denied worker registration promptly enables buffered processing and unavailable status", async ({ page, browserName }) => {
+  test.skip(browserName !== "chromium", "Exercise the desktop streaming eligibility path");
+  await page.addInitScript(() => {
+    ServiceWorkerContainer.prototype.register = async () => {
+      window.registrationDenied = true;
+      throw new DOMException("Registration denied", "SecurityError");
+    };
+  });
+  await page.goto("/");
+  await page.waitForFunction(() => window.registrationDenied);
+  await expect(page.locator("#enc-file")).toBeAttached({ timeout: 2000 });
+  await expect(page.getByTestId("offline-status")).toHaveAttribute("data-state", "unavailable");
+  await expect(page.getByRole("tabpanel", { name: "Encrypt files", exact: true }).getByText("This browser processes one file at a time, up to 1 GiB. Available memory may require a smaller file.")).toBeVisible();
+});
