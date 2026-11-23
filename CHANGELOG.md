@@ -1,5 +1,12 @@
 # [CHANGELOG](#changelog)
 
+## [3.2.5](https://github.com/mksdr/Veli/compare/v3.2.4...v3.2.5) (2026-11-23)
+
+
+### Bug Fixes
+
+* **password:** group weak strength ratings and explain pattern checks ([#65](https://github.com/mksdr/Veli/issues/65)) ([23dc60f](https://github.com/mksdr/Veli/commit/23dc60f39d9cfb7fdd036e165b26603f56fd2ebe))
+
 ## v3.2.4
 
 
