@@ -13,7 +13,8 @@ const minute = 60,
   century = year * 100;
 
 const strength: Record<Score, TranslationKey> = {
-  0: "very_weak",
+  // Keep the estimator's scores, but group both guessable bands in the UI.
+  0: "weak",
   1: "weak",
   2: "moderate",
   3: "good",
