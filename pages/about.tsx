@@ -2,7 +2,9 @@
 import fs from "fs";
 import path from "path";
 import type { GetStaticProps } from "next";
-import { marked } from "marked";
+import { Marked } from "marked";
+import { gfmHeadingId } from "marked-gfm-heading-id";
+import { markedHighlight } from "marked-highlight";
 import AppBar from "@mui/material/AppBar";
 import IconButton from "@mui/material/IconButton";
 import Toolbar from "@mui/material/Toolbar";
@@ -28,16 +30,15 @@ export interface AboutProps {
   changelog: string;
 }
 
-marked.setOptions({
-  highlight: function (code: string, lang: string) {
-    const grammar = prism.languages[lang];
-    if (grammar) {
-      return prism.highlight(code, grammar, lang);
-    } else {
-      return code;
-    }
-  },
-});
+const markdown = new Marked(
+  gfmHeadingId(),
+  markedHighlight({
+    highlight(code, lang) {
+      const grammar = prism.languages[lang];
+      return grammar ? prism.highlight(code, grammar, lang) : code;
+    },
+  }),
+);
 
 // Explicit pixel lengths preserve the original document layout under sx.
 const contentSx: SxProps<Theme> = (theme) => ({
@@ -214,9 +215,9 @@ export default function About(props: AboutProps) {
         <Container maxWidth="lg">
           <Box sx={(theme) => theme.mixins.toolbar} />
 
-          <div dangerouslySetInnerHTML={{ __html: marked(docContent) }}></div>
+          <div dangerouslySetInnerHTML={{ __html: markdown.parse(docContent, { async: false }) }}></div>
           <div
-            dangerouslySetInnerHTML={{ __html: marked(props.changelog) }}
+            dangerouslySetInnerHTML={{ __html: markdown.parse(props.changelog, { async: false }) }}
           ></div>
         </Container>
       </Box>

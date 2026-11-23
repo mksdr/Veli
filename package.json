@@ -25,6 +25,8 @@
     "@zxcvbn-ts/language-en": "^4.1.2",
     "libsodium-wrappers-sumo": "^0.8.4",
     "marked": "18.2.1",
+    "marked-gfm-heading-id": "4.1.4",
+    "marked-highlight": "2.2.4",
     "next": "16.4.6",
     "prismjs": "^1.30.0",
     "qrcode.react": "^4.2.0",

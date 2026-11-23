@@ -45,6 +45,23 @@ test("exported pages include their styles before JavaScript runs", async ({ brow
   }
 });
 
+test("exported help includes working section anchors and highlighted JavaScript", async ({ browser }) => {
+  const context = await browser.newContext({ javaScriptEnabled: false });
+  try {
+    const page = await context.newPage();
+    await page.goto("/about/");
+    const main = page.locator("main");
+    await expect(main.locator("h1#technical-details")).toHaveText("Technical Details");
+    const missingTargets = await main.locator('a[href^="#"]').evaluateAll((links) =>
+      links.map((link) => link.hash.slice(1)).filter((id) => !document.getElementById(id)),
+    );
+    expect(missingTargets).toEqual([]);
+    await expect(main.locator("pre code.language-javascript .token.keyword").first()).toBeVisible();
+  } finally {
+    await context.close();
+  }
+});
+
 for (const route of ["/about/", "/generate-keys/"]) {
   test(`${route} keeps its layout when switching themes and reloading`, async ({ page }) => {
     const errors = [];
