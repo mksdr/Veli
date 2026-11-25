@@ -34,11 +34,17 @@ async function buildOfflineWorker(root) {
     return file.startsWith("_next/data/") && /\/(index|headless|generate-keys)\.json$/.test(file);
   });
   const hash = createHash("sha256");
-  for (const file of precache) { hash.update(file); hash.update(await readFile(join(root, file))); }
+  const integrity = {};
+  for (const file of precache) {
+    const contents = await readFile(join(root, file));
+    hash.update(file);
+    hash.update(contents);
+    integrity["/" + file] = "sha256-" + createHash("sha256").update(contents).digest("base64");
+  }
   // Include worker sources so worker-only changes also produce a new cache.
   for (const file of await filesUnder(join(__dirname, "../service-worker"))) {
     hash.update(await readFile(join(__dirname, "../service-worker", file)));
   }
-  await buildServiceWorker({ outfile: join(root, "service-worker.js"), precache: precache.map(file => "/" + file), version: hash.digest("hex").slice(0, 20), minify: true });
+  await buildServiceWorker({ outfile: join(root, "service-worker.js"), precache: integrity, version: hash.digest("hex").slice(0, 20), minify: true });
 }
 module.exports = { buildOfflineWorker };

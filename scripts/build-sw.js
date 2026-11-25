@@ -42,7 +42,7 @@ async function buildServiceWorker(options = {}) {
     },
     define: {
       global: "self",
-      __PRECACHE__: JSON.stringify(options.precache ?? []),
+      __PRECACHE__: JSON.stringify(options.precache ?? {}),
       __CACHE_VERSION__: JSON.stringify(options.version ?? "development"),
     },
     plugins: [emptyNodeModulesPlugin],

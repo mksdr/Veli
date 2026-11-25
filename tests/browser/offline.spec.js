@@ -43,6 +43,25 @@ async function downloadDecrypted(page, panel) {
   expect(await contents(await download)).toEqual(plaintext);
 }
 
+test('reopening online restores an evicted page without reinstalling the worker', async ({ page, context, offlineServer }) => {
+  await prepare(page);
+  await page.evaluate(async () => {
+    window.initialWorker = navigator.serviceWorker.controller;
+    const name = (await caches.keys()).find(key => key.startsWith('veli-offline-'));
+    const cache = await caches.open(name);
+    if (!await cache.delete('/generate-keys/index.html')) throw new Error('Expected a cached key generation page');
+  });
+
+  const reopened = await context.newPage();
+  await prepare(reopened);
+  expect(await page.evaluate(() => navigator.serviceWorker.controller === window.initialWorker)).toBe(true);
+
+  await disconnect(context, offlineServer);
+  await reopened.goto('/generate-keys/');
+  await reopened.locator('.keyPairGenerateBtn').click();
+  await expect(reopened.locator('#generatedPublicKey')).not.toHaveValue('');
+});
+
 test('prepares unvisited pages, reloads offline, and keeps About online only', async ({ page, context, offlineServer, browserName }) => {
   await prepare(page);
   const cachePaths = await page.evaluate(async () => {

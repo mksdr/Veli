@@ -18,16 +18,25 @@ function withoutRedirectHistory(response: Response): Response {
     : response;
 }
 
-export function installOffline(scope: ServiceWorkerGlobalScope, precache: string[], version: string): void {
-  if (!precache.length) return;
+export function installOffline(scope: ServiceWorkerGlobalScope, precache: Record<string, string>, version: string): void {
+  const paths = Object.keys(precache);
+  if (!paths.length) return;
   const cacheName = prefix + version;
-  const allowed = new Set(precache);
+  const allowed = new Set(paths);
+  const request = (path: string, integrity?: string) =>
+    new Request(new URL(path, scope.location.origin), { cache: "reload", integrity });
+  const missingPaths = async (cache: Cache) => {
+    const keys = new Set((await cache.keys()).map(request => new URL(request.url).pathname));
+    return paths.filter(path => !keys.has(path));
+  };
+  let repair: Promise<void> | undefined;
+
   scope.addEventListener("install", event => {
     event.waitUntil((async () => {
       const cache = await caches.open(cacheName);
       try {
         // Fetch with revalidation disabled so a deployment cannot reuse stale HTML.
-        await cache.addAll(precache.map(url => new Request(new URL(url, scope.location.origin), { cache: "reload" })));
+        await cache.addAll(paths.map(path => request(path)));
       } catch (error) {
         await caches.delete(cacheName);
         throw error;
@@ -42,11 +51,27 @@ export function installOffline(scope: ServiceWorkerGlobalScope, precache: string
     })());
   });
   scope.addEventListener("message", event => {
-    if (event.data?.cmd !== "getOfflineStatus") return;
+    const port = event.ports[0];
+    if (event.data?.cmd !== "getOfflineStatus" || !port) return;
     event.waitUntil((async () => {
-      const cache = await caches.open(cacheName);
-      const keys = new Set((await cache.keys()).map(request => new URL(request.url).pathname));
-      event.ports[0]?.postMessage({ ready: precache.every(url => keys.has(url)) });
+      let ready = false;
+      try {
+        const cache = await caches.open(cacheName);
+        const missing = await missingPaths(cache);
+        ready = missing.length === 0;
+        if (!ready && event.data.repair === true) {
+          port.postMessage({ repairing: true });
+          // An active worker may serve an older build while an update waits.
+          // Only restore responses whose bytes match this worker's build.
+          repair ??= cache.addAll(missing.map(path => request(path, precache[path])))
+            .finally(() => { repair = undefined; });
+          await repair;
+          ready = (await missingPaths(await caches.open(cacheName))).length === 0;
+        }
+      } catch {
+        // Keep surviving entries and let the next online visit retry.
+      }
+      port.postMessage({ ready });
     })());
   });
   scope.addEventListener("fetch", event => {

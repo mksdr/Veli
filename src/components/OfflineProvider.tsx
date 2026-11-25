@@ -14,25 +14,41 @@ export default function OfflineProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     let disposed = false;
     let registration: ServiceWorkerRegistration | null = null;
+    let stopCheck: (() => void) | undefined;
     const workers = new Set<ServiceWorker>();
-    const timers = new Set<ReturnType<typeof setTimeout>>();
-    const channels = new Set<MessageChannel>();
     const updateOnline = () => setOnline(navigator.onLine);
     const check = () => {
       if (disposed) return;
       const worker = navigator.serviceWorker.controller;
       if (!worker) return;
+      stopCheck?.();
       const channel = new MessageChannel();
-      channels.add(channel);
-      const finish = (ready: boolean) => {
-        if (!disposed) setStatus(ready ? "ready" : "unavailable");
-        channel.port1.close(); channel.port2.close(); channels.delete(channel);
-        clearTimeout(timer); timers.delete(timer);
+      stopCheck = () => {
+        clearTimeout(timer);
+        channel.port1.onmessage = null;
+        channel.port1.close();
+        channel.port2.close();
+        stopCheck = undefined;
       };
-      const timer = setTimeout(() => finish(false), 3000);
-      timers.add(timer);
-      channel.port1.onmessage = event => finish(event.data?.ready === true);
-      worker.postMessage({ cmd: "getOfflineStatus" }, [channel.port2]);
+      const finish = (ready: boolean) => {
+        stopCheck?.();
+        setStatus(ready ? "ready" : "unavailable");
+      };
+      let timer = setTimeout(() => finish(false), 3000);
+      channel.port1.onmessage = event => {
+        if (event.data?.repairing === true) {
+          setStatus("preparing");
+          clearTimeout(timer);
+          timer = setTimeout(() => finish(false), 60000);
+        } else {
+          finish(event.data?.ready === true);
+        }
+      };
+      try {
+        worker.postMessage({ cmd: "getOfflineStatus", repair: navigator.onLine }, [channel.port2]);
+      } catch {
+        finish(false);
+      }
     };
     const changed = () => {
       if (disposed || !registration) return;
@@ -68,8 +84,7 @@ export default function OfflineProvider({ children }: { children: ReactNode }) {
       navigator.serviceWorker?.removeEventListener("controllerchange", check);
       registration?.removeEventListener("updatefound", watch);
       workers.forEach(worker => worker.removeEventListener("statechange", changed));
-      timers.forEach(clearTimeout);
-      channels.forEach(channel => { channel.port1.close(); channel.port2.close(); });
+      stopCheck?.();
     };
   }, []);
   return <OfflineContext.Provider value={{ online }}>
