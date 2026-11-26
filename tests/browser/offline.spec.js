@@ -35,6 +35,115 @@ async function prepare(page) {
   await page.goto('/');
   await expect(page.getByTestId('offline-status')).toHaveAttribute('data-state', 'ready', { timeout: 30000 });
 }
+
+async function openWithWorkerState(page, { slot, state, controlled = false, hasWaitingUpdate = false }) {
+  await page.addInitScript(({ slot, state, controlled, hasWaitingUpdate }) => {
+    const requests = [];
+    const createWorker = state => Object.assign(new EventTarget(), {
+      state,
+      postMessage(data, [port]) {
+        if (data.cmd === 'getOfflineStatus') requests.push(port);
+      },
+    });
+    const worker = createWorker(state);
+    const registration = Object.assign(new EventTarget(), { installing: null, waiting: null, active: null });
+    registration[slot] = worker;
+    if (hasWaitingUpdate) registration.waiting = createWorker('installed');
+    const container = navigator.serviceWorker;
+    const fixture = window.workerFixture = { requests, createWorker, worker, registration, controller: controlled ? worker : null };
+    Object.defineProperties(container, {
+      controller: { get: () => fixture.controller },
+      register: { value: async () => { fixture.registered = true; return registration; } },
+    });
+  }, { slot, state, controlled, hasWaitingUpdate });
+  await page.goto('/');
+  await page.waitForFunction(() => window.workerFixture.registered);
+  return page.getByTestId('offline-status');
+}
+
+test('first installation stays preparing until the activating worker claims the page', async ({ page }) => {
+  const status = await openWithWorkerState(page, { slot: 'installing', state: 'installing' });
+  await page.evaluate(() => {
+    const { registration, worker } = window.workerFixture;
+    registration.installing = null;
+    registration.waiting = worker;
+    worker.state = 'installed';
+    worker.dispatchEvent(new Event('statechange'));
+    registration.waiting = null;
+    registration.active = worker;
+    worker.state = 'activating';
+    worker.dispatchEvent(new Event('statechange'));
+    // Let the UI render before the worker claims the page.
+    return new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)));
+  });
+  await expect(status).toHaveAttribute('data-state', 'preparing');
+  await page.evaluate(() => {
+    const fixture = window.workerFixture;
+    fixture.controller = fixture.worker;
+    navigator.serviceWorker.dispatchEvent(new Event('controllerchange'));
+    fixture.requests[0].postMessage({ ready: true });
+  });
+  await expect(status).toHaveAttribute('data-state', 'ready');
+});
+
+test('a first worker already waiting at registration can become redundant', async ({ page }) => {
+  const status = await openWithWorkerState(page, { slot: 'waiting', state: 'installed' });
+  await expect(status).toHaveAttribute('data-state', 'preparing');
+  await page.evaluate(() => {
+    const { registration, worker } = window.workerFixture;
+    worker.state = 'redundant';
+    worker.dispatchEvent(new Event('statechange'));
+    // A registration slot can be cleared after statechange is dispatched.
+    registration.waiting = null;
+  });
+  await expect(status).toHaveAttribute('data-state', 'unavailable');
+});
+
+test('activation completing without a controller becomes unavailable', async ({ page }) => {
+  const status = await openWithWorkerState(page, { slot: 'active', state: 'activating' });
+  await expect(status).toHaveAttribute('data-state', 'preparing');
+  await page.evaluate(() => {
+    const { worker } = window.workerFixture;
+    worker.state = 'activated';
+    worker.dispatchEvent(new Event('statechange'));
+  });
+  await expect(status).toHaveAttribute('data-state', 'unavailable');
+});
+
+test('a page bypassing an activated worker is unavailable even with a waiting update', async ({ page }) => {
+  const status = await openWithWorkerState(page, { slot: 'active', state: 'activated', hasWaitingUpdate: true });
+  await expect(status).toHaveAttribute('data-state', 'unavailable');
+});
+
+test('a background update does not interrupt an offline cache repair', async ({ page }) => {
+  const status = await openWithWorkerState(page, { slot: 'active', state: 'activated', controlled: true });
+  await expect.poll(() => page.evaluate(() => window.workerFixture.requests.length)).toBe(1);
+  await page.evaluate(() => window.workerFixture.requests[0].postMessage({ ready: true }));
+  await expect(status).toHaveAttribute('data-state', 'ready');
+  await page.evaluate(() => {
+    const fixture = window.workerFixture;
+    const nextController = fixture.createWorker('activated');
+    fixture.registration.active = nextController;
+    fixture.controller = nextController;
+    navigator.serviceWorker.dispatchEvent(new Event('controllerchange'));
+    fixture.requests[1].postMessage({ repairing: true });
+  });
+  await expect(status).toHaveAttribute('data-state', 'preparing');
+  await page.evaluate(() => {
+    const { registration, createWorker, requests } = window.workerFixture;
+    const update = createWorker('installing');
+    registration.installing = update;
+    registration.dispatchEvent(new Event('updatefound'));
+    registration.installing = null;
+    registration.waiting = update;
+    update.state = 'installed';
+    update.dispatchEvent(new Event('statechange'));
+    requests[1].postMessage({ ready: true });
+  });
+  expect(await page.evaluate(() => window.workerFixture.requests.length)).toBe(2);
+  await expect(status).toHaveAttribute('data-state', 'ready');
+});
+
 async function downloadDecrypted(page, panel) {
   const download = page.waitForEvent('download');
   const stream = panel.getByRole('button', { name: 'Decrypt & download', exact: true });

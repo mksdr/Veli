@@ -29,11 +29,7 @@ export default function OfflineProvider({ children }: { children: ReactNode }) {
     let stopCheck: (() => void) | undefined;
     const workers = new Set<ServiceWorker>();
     const updateOnline = () => setOnline(navigator.onLine);
-    const check = () => {
-      if (disposed) return;
-      const worker = navigator.serviceWorker.controller;
-      if (!worker) return;
-      stopCheck?.();
+    const check = (worker: ServiceWorker) => {
       const channel = new MessageChannel();
       stopCheck = () => {
         clearTimeout(timer);
@@ -62,17 +58,34 @@ export default function OfflineProvider({ children }: { children: ReactNode }) {
         finish(false);
       }
     };
-    const changed = () => {
+    const updateRegistrationStatus = () => {
       if (disposed || !registration) return;
-      if (registration.active && navigator.serviceWorker.controller) check();
-      else if (!registration.installing && !registration.waiting) setStatus("unavailable");
-    };
-    const watch = () => {
-      const worker = registration?.installing;
-      if (worker && !workers.has(worker)) {
-        workers.add(worker);
-        worker.addEventListener("statechange", changed);
+      // A worker can report redundancy before the registration clears its slot.
+      const [installing, waiting, active] = [registration.installing, registration.waiting, registration.active]
+        .map(worker => worker?.state === "redundant" ? null : worker);
+      const controlled = Boolean(navigator.serviceWorker.controller);
+      const currentWorkers = controlled ? [] : [installing, waiting, active];
+      for (const worker of workers) {
+        if (currentWorkers.includes(worker)) continue;
+        worker.removeEventListener("statechange", updateRegistrationStatus);
+        workers.delete(worker);
       }
+      for (const worker of currentWorkers) {
+        if (!worker || workers.has(worker)) continue;
+        worker.addEventListener("statechange", updateRegistrationStatus);
+        workers.add(worker);
+      }
+      if (controlled) return;
+      // A forced reload can bypass an activated worker even when an update is pending.
+      const preparing = active ? active.state !== "activated" : Boolean(installing || waiting);
+      setStatus(preparing ? "preparing" : "unavailable");
+    };
+    const controllerChanged = () => {
+      if (disposed) return;
+      stopCheck?.();
+      updateRegistrationStatus();
+      const controller = navigator.serviceWorker.controller;
+      if (controller) check(controller);
     };
     updateOnline();
     // eslint-disable-next-line react-hooks/set-state-in-effect -- Safari exposes the launch mode on the client.
@@ -83,17 +96,17 @@ export default function OfflineProvider({ children }: { children: ReactNode }) {
       if (disposed) return;
       registration = result;
       if (!result) { setStatus("unavailable"); return; }
-      navigator.serviceWorker.addEventListener("controllerchange", check);
-      result.addEventListener("updatefound", watch);
-      watch(); changed();
+      navigator.serviceWorker.addEventListener("controllerchange", controllerChanged);
+      result.addEventListener("updatefound", updateRegistrationStatus);
+      controllerChanged();
     });
     return () => {
       disposed = true;
       window.removeEventListener("online", updateOnline);
       window.removeEventListener("offline", updateOnline);
-      navigator.serviceWorker?.removeEventListener("controllerchange", check);
-      registration?.removeEventListener("updatefound", watch);
-      workers.forEach(worker => worker.removeEventListener("statechange", changed));
+      navigator.serviceWorker?.removeEventListener("controllerchange", controllerChanged);
+      registration?.removeEventListener("updatefound", updateRegistrationStatus);
+      workers.forEach(worker => worker.removeEventListener("statechange", updateRegistrationStatus));
       stopCheck?.();
     };
   }, []);
