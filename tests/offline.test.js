@@ -66,7 +66,9 @@ function harness(version = 'new') {
   }
   function fetch(url, options = {}) {
     let response;
-    const request = new Request(new URL(url, scope.location.origin), options);
+    const request = options.mode === 'navigate'
+      ? { url: new URL(url, scope.location.origin).href, method: 'GET', mode: 'navigate' }
+      : new Request(new URL(url, scope.location.origin), options);
     handlers.fetch({ request, respondWith(value) { response = value; } });
     return response;
   }
@@ -138,17 +140,15 @@ test('development builds install no offline event handlers', () => {
   assert.equal(count, 0);
 });
 
-test('cached redirected HTML is returned without redirect history or lost headers/body', async () => {
+test('a complete cache serves redirected HTML without a network request or lost headers/body', async t => {
   const h = harness();
+  await h.event('install');
   const cached = new Response('redirected HTML', { headers: { 'Content-Type': 'text/html; charset=utf-8', 'X-Test': 'preserved' } });
   Object.defineProperty(cached, 'redirected', { value: true });
-  h.stores.set('veli-offline-new', new Map([['/index.html', cached]]));
-  let pending;
-  h.handlers.fetch({
-    request: { url: 'https://veli.test/?tab=decryption', method: 'GET', mode: 'navigate' },
-    respondWith(value) { pending = value; },
-  });
-  const response = await pending;
+  h.stores.get('veli-offline-new').set('/index.html', cached);
+  const network = t.mock.method(globalThis, 'fetch', async () => new Response('online page'));
+  const response = await h.fetch('/?tab=decryption', { mode: 'navigate' });
+  assert.equal(network.mock.callCount(), 0);
   assert.equal(response.redirected, false);
   assert.equal(response.status, 200);
   assert.equal(response.headers.get('X-Test'), 'preserved');
@@ -156,14 +156,39 @@ test('cached redirected HTML is returned without redirect history or lost header
   assert.equal(await response.text(), 'redirected HTML');
 });
 
-for (const operation of ['open', 'match']) {
+test('an incomplete cache prefers the network and falls back to the cached page offline', async t => {
+  const h = harness();
+  await h.event('install');
+  const cache = h.stores.get('veli-offline-new');
+  cache.delete('/headless/index.html');
+  const cached = new Response('old page');
+  Object.defineProperty(cached, 'redirected', { value: true });
+  cache.set('/index.html', cached);
+  const network = t.mock.method(globalThis, 'fetch', async () => new Response('online page'));
+
+  const url = '/?tab=decryption';
+  assert.equal(await (await h.fetch(url, { mode: 'navigate' })).text(), 'online page');
+  const [request, options] = network.mock.calls[0].arguments;
+  assert.equal(request.url, 'https://veli.test' + url);
+  assert.equal(options.cache, 'reload');
+  assert.equal(cache.get('/index.html'), cached);
+
+  network.mock.mockImplementation(async () => { throw new Error('Network lost'); });
+  const fallback = await h.fetch(url, { mode: 'navigate' });
+  assert.equal(fallback.redirected, false);
+  assert.equal(await fallback.text(), 'old page');
+  await assert.rejects(h.fetch('/headless/', { mode: 'navigate' }), /Network lost/);
+});
+
+for (const operation of ['open', 'match', 'keys']) {
   test(`a cache ${operation} error falls back to the original navigation request`, async t => {
     const h = harness();
+    await h.event('install');
     const open = caches.open;
     t.mock.method(caches, 'open', async name => {
       if (operation === 'open') throw new Error('Cache storage unavailable');
       const cache = await open(name);
-      cache.match = async () => { throw new Error('Cache entry unreadable'); };
+      cache[operation] = async () => { throw new Error('Cache entry unreadable'); };
       return cache;
     });
     const network = t.mock.method(globalThis, 'fetch', async () => new Response('online page'));

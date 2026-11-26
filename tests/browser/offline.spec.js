@@ -272,6 +272,36 @@ test('reopening online restores an evicted page without reinstalling the worker'
   await expect(reopened.locator('#generatedPublicKey')).not.toHaveValue('');
 });
 
+test('an incomplete old cache opens the latest page online without replacing cached HTML', async ({ page, context, offlineServer }) => {
+  await prepare(page);
+  const oldChunk = await page.locator('script[src*="/pages/index-"]').getAttribute('src');
+  const newChunk = oldChunk.replace(/\.js$/, '-new.js');
+  const [oldHtml, chunk] = await Promise.all([
+    fs.readFile(path.join('out', 'index.html'), 'utf8'),
+    fs.readFile(path.join('out', oldChunk)),
+  ]);
+  expect(await page.evaluate(async chunk => {
+    const name = (await caches.keys()).find(key => key.startsWith('veli-offline-'));
+    return (await caches.open(name)).delete(chunk);
+  }, oldChunk)).toBe(true);
+  offlineServer.setFile(oldChunk, null);
+  offlineServer.setFile(newChunk, chunk);
+  offlineServer.setFile('/', oldHtml.replaceAll(oldChunk, newChunk));
+  expect((await page.request.get(oldChunk)).status()).toBe(404);
+
+  const reopened = await context.newPage();
+  const navigation = await reopened.goto('/?tab=decryption');
+  expect(navigation.fromServiceWorker()).toBe(true);
+  await expect(reopened.getByRole('tab', { name: 'Decrypt' })).toHaveAttribute('aria-selected', 'true');
+  await expect(reopened.locator('#dec-file')).toBeAttached();
+  await expect(reopened.getByTestId('offline-status')).toHaveAttribute('data-state', 'unavailable');
+  const cachedHtml = await reopened.evaluate(async () => {
+    const name = (await caches.keys()).find(key => key.startsWith('veli-offline-'));
+    return (await (await caches.open(name)).match('/index.html')).text();
+  });
+  expect(cachedHtml).toBe(oldHtml);
+});
+
 test('the iPhone and iPad Home Screen app prepares on its first online launch', async ({ page, context, offlineServer }, testInfo) => {
   test.skip(!['iphone-webkit', 'ipad-webkit'].includes(testInfo.project.name), 'Exercise the Apple mobile Home Screen flow');
   // Playwright emulates the launch mode in a fresh profile with its own storage.

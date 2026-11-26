@@ -90,8 +90,29 @@ export function installOffline(scope: ServiceWorkerGlobalScope, precache: Record
         await readCached("/offline.html") ?? Response.error()).then(withoutRedirectHistory));
       return;
     }
-    const key = event.request.mode === "navigate" ? pages[url.pathname] : url.pathname;
+    const navigating = event.request.mode === "navigate";
+    const key = navigating ? pages[url.pathname] : url.pathname;
     if (!key || !allowed.has(key)) return;
+    if (navigating) {
+      event.respondWith((async () => {
+        let cached: Response | undefined;
+        try {
+          const cache = await caches.open(cacheName);
+          cached = await cache.match(key);
+          if (cached && (await missingPaths(cache)).length === 0) return withoutRedirectHistory(cached);
+        } catch {
+          // An unreadable cache may still have a usable page if the network fails.
+        }
+        // A newer deployment may no longer serve the old page's missing chunks.
+        try {
+          return withoutRedirectHistory(await fetch(event.request, { cache: "reload" }));
+        } catch (error) {
+          if (!cached) throw error;
+          return withoutRedirectHistory(cached);
+        }
+      })());
+      return;
+    }
     event.respondWith((async () => {
       const cached = await readCached(key);
       // Never cache arbitrary runtime requests, including credentials or downloads.
