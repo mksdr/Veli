@@ -72,30 +72,29 @@ export async function waitForWorkerControl(
   }
 }
 
-export function hasWorkerProtocol(
-  navigator: WorkerNavigatorLike,
+export function watchWorkerProtocol(
+  controller: ServiceWorkerControllerLike,
+  onResult: (supported: boolean) => void,
   timeoutMs = 2000,
-): Promise<boolean> {
-  return new Promise<boolean>(resolve => {
-    const channel = new MessageChannel();
-    const finish = (value: boolean) => {
-      clearTimeout(timer);
-      channel.port1.close();
-      channel.port2.close();
-      resolve(value);
-    };
-    const timer = setTimeout(() => finish(false), timeoutMs);
-    channel.port1.onmessage = (event: MessageEvent<{ version?: number }>) =>
-      finish(event.data?.version === 1);
-    try {
-      if (!navigator.serviceWorker.controller) {
-        finish(false);
-        return;
-      }
-      navigator.serviceWorker.controller.postMessage(
-        { cmd: "getProtocolVersion" },
-        [channel.port2],
-      );
-    } catch { finish(false); }
-  });
+): () => void {
+  const channel = new MessageChannel();
+  // Let the UI fall back while keeping the channel open for slow worker initialization.
+  const timer = setTimeout(() => onResult(false), timeoutMs);
+  const stop = () => {
+    clearTimeout(timer);
+    channel.port1.onmessage = null;
+    channel.port1.close();
+    channel.port2.close();
+  };
+  channel.port1.onmessage = (event: MessageEvent<{ version?: number }>) => {
+    stop();
+    onResult(event.data?.version === 1);
+  };
+  try {
+    controller.postMessage({ cmd: "getProtocolVersion" }, [channel.port2]);
+  } catch {
+    stop();
+    onResult(false);
+  }
+  return stop;
 }

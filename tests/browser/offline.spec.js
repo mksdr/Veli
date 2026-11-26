@@ -39,10 +39,12 @@ async function prepare(page) {
 async function openWithWorkerState(page, { slot, state, controlled = false, hasWaitingUpdate = false }) {
   await page.addInitScript(({ slot, state, controlled, hasWaitingUpdate }) => {
     const requests = [];
+    const protocolRequests = [];
     const createWorker = state => Object.assign(new EventTarget(), {
       state,
       postMessage(data, [port]) {
         if (data.cmd === 'getOfflineStatus') requests.push(port);
+        if (data.cmd === 'getProtocolVersion') protocolRequests.push(port);
       },
     });
     const worker = createWorker(state);
@@ -50,7 +52,7 @@ async function openWithWorkerState(page, { slot, state, controlled = false, hasW
     registration[slot] = worker;
     if (hasWaitingUpdate) registration.waiting = createWorker('installed');
     const container = navigator.serviceWorker;
-    const fixture = window.workerFixture = { requests, createWorker, worker, registration, controller: controlled ? worker : null };
+    const fixture = window.workerFixture = { requests, protocolRequests, createWorker, worker, registration, controller: controlled ? worker : null };
     Object.defineProperties(container, {
       controller: { get: () => fixture.controller },
       register: { value: async () => { fixture.registered = true; return registration; } },
@@ -143,6 +145,30 @@ test('a background update does not interrupt an offline cache repair', async ({ 
   expect(await page.evaluate(() => window.workerFixture.requests.length)).toBe(2);
   await expect(status).toHaveAttribute('data-state', 'ready');
 });
+
+for (const controlled of [false, true]) {
+  test(`a delayed worker protocol reply enables streaming ${controlled ? 'on a controlled navigation' : 'after a first claim'}`, async ({ page, browserName }) => {
+    test.skip(browserName === 'webkit', 'Exercise the desktop streaming eligibility path');
+    await page.clock.install();
+    await openWithWorkerState(page, { slot: 'active', state: 'activated', controlled });
+    const fileInput = page.locator('#enc-file');
+    if (!controlled) {
+      await expect(fileInput).toBeAttached();
+      await page.evaluate(() => {
+        const fixture = window.workerFixture;
+        fixture.controller = fixture.worker;
+        navigator.serviceWorker.dispatchEvent(new Event('controllerchange'));
+      });
+    }
+    await page.waitForFunction(() => window.workerFixture.protocolRequests.length === 1);
+    await page.clock.fastForward(2100);
+    await expect(fileInput).toBeAttached();
+    await expect(fileInput).not.toHaveAttribute('multiple', '');
+
+    await page.evaluate(() => window.workerFixture.protocolRequests[0].postMessage({ version: 1 }));
+    await expect(fileInput).toHaveAttribute('multiple', '');
+  });
+}
 
 async function downloadDecrypted(page, panel) {
   const download = page.waitForEvent('download');

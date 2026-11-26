@@ -5,7 +5,7 @@ const { encryptLegacy, decryptLegacy, chunkSize } = require("./helpers/legacyCry
 const { pullChunk } = require("../src/utils/secretstream.ts");
 const { decryptFile } = require("../src/utils/decryptFile.ts");
 const { installWorker } = require("../service-worker/worker.ts");
-const { registerWorker, waitForWorkerControl, hasWorkerProtocol } = require("../src/utils/workerSupport.ts");
+const { registerWorker, waitForWorkerControl, watchWorkerProtocol } = require("../src/utils/workerSupport.ts");
 const { getStoredValue, setStoredValue } = require("../src/utils/storage.ts");
 const { formatName } = require("../src/helpers/formatName.ts");
 
@@ -271,10 +271,17 @@ test("worker registration waits for control and times out without leaking listen
 });
 
 test("falls back from an older worker that does not implement the protocol", async () => {
-  assert.equal(await hasWorkerProtocol({ serviceWorker: { controller: { postMessage() {} } } }, 5), false);
-  assert.equal(await hasWorkerProtocol({ serviceWorker: { controller: {
-    postMessage(data, ports) { ports[0].postMessage({ version: 1 }); },
-  } } }, 100), true);
+  const { promise, resolve } = Promise.withResolvers();
+  const stop = watchWorkerProtocol({ postMessage() {} }, resolve, 5);
+  try { assert.equal(await promise, false); }
+  finally { stop(); }
+
+  for (const version of [1, 2]) {
+    const supported = await new Promise(resolve => watchWorkerProtocol({
+      postMessage(data, ports) { ports[0].postMessage({ version }); },
+    }, resolve));
+    assert.equal(supported, version === 1);
+  }
 });
 
 test("download setup echoes its request token and can be cancelled before fetching", async () => {
