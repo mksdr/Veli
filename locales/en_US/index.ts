@@ -2,6 +2,8 @@ const en_US = {
   "pwa_preparing": "Preparing for offline use…",
   "pwa_ready": "Ready for offline use",
   "pwa_unavailable": "Offline use is unavailable. Connect and reopen Veli to try again.",
+  "pwa_home_screen_setup": "If you add Veli to your Home Screen, open it from its icon while online and wait for “Ready for offline use” there.",
+  "pwa_home_screen_preparing": "Keep Veli open and connected until it’s ready for offline use.",
   "pwa_about_online": "Help requires an internet connection.",
 
   "file_processing_error": "File processing failed. Check the password or keys and try again with the original file. Delete any incomplete download before retrying.",

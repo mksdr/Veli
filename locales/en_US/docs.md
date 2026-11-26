@@ -99,6 +99,10 @@ These commands build Veli locally and do not require a published container image
 
 ---
 
+## Offline use on iPhone and iPad
+
+After adding Veli to the Home Screen, stay online and open it from its Home Screen icon. Wait for **Ready for offline use** inside the app before disconnecting. The Home Screen app prepares its own offline cache.
+
 ## File Encryption
 
 - ### using a password

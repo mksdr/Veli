@@ -175,6 +175,11 @@ keys, and download results are never saved in the offline app cache.
 
 Use your browser’s **Install app** option, or **Add to Home Screen** in Safari,
 to open Veli as a standalone app. Installation is optional for offline use.
+
+On iPhone and iPad, the Home Screen app prepares its own offline cache. After
+adding Veli, stay online, open it from its Home Screen icon, and wait for
+**Ready for offline use** inside the app before disconnecting.
+
 Safari and mobile browsers retain their existing one-file, up-to-1-GiB buffered
 processing limit; available memory may require smaller files.
 

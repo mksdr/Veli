@@ -4,6 +4,8 @@ const ko_KR: Translations = {
   "pwa_preparing": "오프라인 사용을 준비하고 있어요…",
   "pwa_ready": "오프라인에서 사용할 준비가 완료됐어요",
   "pwa_unavailable": "오프라인 사용을 준비하지 못했어요. 인터넷에 연결하고 Veli를 다시 열어주세요.",
+  "pwa_home_screen_setup": "Veli를 홈 화면에 추가했다면 인터넷에 연결된 상태에서 홈 화면 아이콘으로 열고 오프라인 준비가 완료될 때까지 기다려주세요.",
+  "pwa_home_screen_preparing": "오프라인 준비가 완료될 때까지 인터넷에 연결된 상태로 Veli를 열어두세요.",
   "pwa_about_online": "도움말을 보려면 인터넷 연결이 필요해요.",
 
   "file_processing_error": "파일을 처리하지 못했어요. 비밀번호나 키를 확인하고 원본 파일로 다시 시도해주세요. 일부만 다운로드된 파일은 삭제해주세요.",

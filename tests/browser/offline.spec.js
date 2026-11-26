@@ -62,8 +62,48 @@ test('reopening online restores an evicted page without reinstalling the worker'
   await expect(reopened.locator('#generatedPublicKey')).not.toHaveValue('');
 });
 
-test('prepares unvisited pages, reloads offline, and keeps About online only', async ({ page, context, offlineServer, browserName }) => {
+test('the iPhone and iPad Home Screen app prepares on its first online launch', async ({ page, context, offlineServer }, testInfo) => {
+  test.skip(!['iphone-webkit', 'ipad-webkit'].includes(testInfo.project.name), 'Exercise the Apple mobile Home Screen flow');
+  // Playwright emulates the launch mode in a fresh profile with its own storage.
+  await context.addInitScript(desktopMode => {
+    Object.defineProperty(navigator, 'standalone', { value: true });
+    if (desktopMode) {
+      Object.defineProperties(navigator, {
+        userAgent: { value: navigator.userAgent.replace(/\(iPad[^)]*\)/, '(Macintosh; Intel Mac OS X 10_15_7)') },
+        platform: { value: 'MacIntel' },
+        maxTouchPoints: { value: 5 },
+      });
+    }
+  }, testInfo.project.name === 'ipad-webkit');
+  await page.addInitScript(() => {
+    const register = ServiceWorkerContainer.prototype.register;
+    const allowRegistration = new Promise(resolve => { window.allowRegistration = resolve; });
+    ServiceWorkerContainer.prototype.register = async function (...args) {
+      await allowRegistration;
+      return register.apply(this, args);
+    };
+  });
+  await page.goto('/');
+  const preparation = page.getByText('Keep Veli open and connected until it’s ready for offline use.', { exact: true });
+  await expect(preparation).toBeVisible();
+  const status = page.getByTestId('offline-status');
+  await expect(status).toHaveAttribute('data-state', 'preparing');
+  await expect(page.getByText('If you add Veli to your Home Screen,', { exact: false })).toHaveCount(0);
+  await page.evaluate(() => window.allowRegistration());
+  await expect(status).toHaveAttribute('data-state', 'ready', { timeout: 30000 });
+  await expect(preparation).toHaveCount(0);
+
+  await disconnect(context, offlineServer);
+  const reopened = await context.newPage();
+  await prepare(reopened);
+  await expect(reopened.locator('#enc-file')).toBeAttached();
+});
+
+test('prepares unvisited pages, reloads offline, and keeps About online only', async ({ page, context, offlineServer, browserName }, testInfo) => {
   await prepare(page);
+  const homeScreenSetup = page.getByText('If you add Veli to your Home Screen,', { exact: false });
+  if (['iphone-webkit', 'ipad-webkit'].includes(testInfo.project.name)) await expect(homeScreenSetup).toBeVisible();
+  else await expect(homeScreenSetup).toHaveCount(0);
   const cachePaths = await page.evaluate(async () => {
     const paths = [];
     for (const name of await caches.keys()) {
