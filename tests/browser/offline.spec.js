@@ -249,6 +249,7 @@ test('a slow first precache leaves streaming usable while offline preparation is
 
 test('a late protocol reply preserves a headless buffered draft and enables streaming after reset', async ({ page, browserName }) => {
   test.skip(browserName === 'webkit', 'Exercise the desktop streaming eligibility path');
+  await page.clock.install();
   await page.addInitScript(() => {
     const post = ServiceWorker.prototype.postMessage;
     ServiceWorker.prototype.postMessage = function (data, ...args) {
@@ -261,11 +262,13 @@ test('a late protocol reply preserves a headless buffered draft and enables stre
   });
   const file = { name: 'buffered-draft.txt', mimeType: 'text/plain', buffer: plaintext };
   await page.goto('/headless/');
+  await page.waitForFunction(() => !!window.resumeProtocol, undefined, { timeout: 15000 });
+  await page.clock.fastForward(2100);
+  await expect(page.locator('#enc-file')).toHaveJSProperty('multiple', false);
   await expect(page.getByRole('button', { name: 'Browse File', exact: true })).toBeEnabled();
   await page.locator('#enc-file').setInputFiles(file);
   await page.getByRole('button', { name: 'Set a password', exact: true }).click();
   await page.getByLabel(/^Password\s*\*?$/).fill(password);
-  await page.waitForFunction(() => !!window.resumeProtocol, undefined, { timeout: 15000 });
   await page.evaluate(() => window.resumeProtocol());
   await expect(page.getByTestId('offline-status')).toHaveAttribute('data-state', 'ready', { timeout: 15000 });
   await expect(page.getByText(file.name, { exact: true }).filter({ visible: true })).toBeVisible();
