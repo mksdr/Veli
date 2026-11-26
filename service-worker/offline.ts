@@ -29,6 +29,14 @@ export function installOffline(scope: ServiceWorkerGlobalScope, precache: Record
     const keys = new Set((await cache.keys()).map(request => new URL(request.url).pathname));
     return paths.filter(path => !keys.has(path));
   };
+  const readCached = async (path: string) => {
+    try {
+      return await (await caches.open(cacheName)).match(path);
+    } catch {
+      // An unreadable cache is a miss. The network may still be available.
+      return undefined;
+    }
+  };
   let repair: Promise<void> | undefined;
 
   scope.addEventListener("install", event => {
@@ -79,13 +87,13 @@ export function installOffline(scope: ServiceWorkerGlobalScope, precache: Record
     if (url.origin !== scope.location.origin || event.request.method !== "GET" || url.pathname === "/file") return;
     if (event.request.mode === "navigate" && /^\/about\/?$/.test(url.pathname)) {
       event.respondWith(fetch(new Request(event.request, { cache: "no-store" })).catch(async () =>
-        (await caches.open(cacheName)).match("/offline.html").then(response => response ?? Response.error())).then(withoutRedirectHistory));
+        await readCached("/offline.html") ?? Response.error()).then(withoutRedirectHistory));
       return;
     }
     const key = event.request.mode === "navigate" ? pages[url.pathname] : url.pathname;
     if (!key || !allowed.has(key)) return;
     event.respondWith((async () => {
-      const cached = await (await caches.open(cacheName)).match(key);
+      const cached = await readCached(key);
       // Never cache arbitrary runtime requests, including credentials or downloads.
       return withoutRedirectHistory(cached ?? await fetch(event.request));
     })());

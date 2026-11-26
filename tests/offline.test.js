@@ -138,3 +138,24 @@ test('cached redirected HTML is returned without redirect history or lost header
   assert.equal(response.headers.get('Content-Type'), 'text/html; charset=utf-8');
   assert.equal(await response.text(), 'redirected HTML');
 });
+
+for (const operation of ['open', 'match']) {
+  test(`a cache ${operation} error falls back to the original navigation request`, async t => {
+    const h = harness();
+    const open = caches.open;
+    t.mock.method(caches, 'open', async name => {
+      if (operation === 'open') throw new Error('Cache storage unavailable');
+      const cache = await open(name);
+      cache.match = async () => { throw new Error('Cache entry unreadable'); };
+      return cache;
+    });
+    const network = t.mock.method(globalThis, 'fetch', async () => new Response('online page'));
+    const request = { url: 'https://veli.test/?tab=decryption', method: 'GET', mode: 'navigate' };
+    let pending;
+    h.handlers.fetch({ request, respondWith(value) { pending = value; } });
+
+    assert.equal(await (await pending).text(), 'online page');
+    assert.equal(network.mock.callCount(), 1);
+    assert.equal(network.mock.calls[0].arguments[0], request);
+  });
+}
