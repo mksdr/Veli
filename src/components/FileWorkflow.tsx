@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState, type ReactNode } from "react";
+import { useRouter } from "next/router";
 import { Alert, AlertTitle, Box, Button, CircularProgress, Dialog, DialogActions, DialogContent, DialogContentText, DialogTitle, Divider, IconButton, InputAdornment, MenuItem, Paper, Select, Stack, TextField, Tooltip, Typography, type SelectChangeEvent } from "@mui/material";
 import type { DropzoneRootProps } from "react-dropzone";
 import DescriptionOutlined from "@mui/icons-material/DescriptionOutlined";
@@ -81,9 +82,20 @@ export default function FileWorkflow({ direction, active, step, done, buffered =
   const [cancelOpen, setCancelOpen] = useState(false);
   const [linkError, setLinkError] = useState(false);
   const [linkPending, setLinkPending] = useState(false);
+  const [choosingFile, setChoosingFile] = useState(false);
   const fileInput = useRef<HTMLInputElement>(null), heading = useRef<HTMLHeadingElement>(null), passwordInput = useRef<HTMLInputElement>(null), operationAlert = useRef<HTMLDivElement>(null);
   const busy = checking || testing || processing || generating || linkPending;
-  useWorkflowStatus(direction, busy, files.length > 0 || !!password || !!privateKey || !!publicKey);
+  const { publicKey: queryKey } = useRouter().query;
+  const invitationKey = Array.isArray(queryKey) ? queryKey[0] : queryKey;
+  const enteredPublicKey = !!publicKey && (!publicKeyNotice || publicKey !== invitationKey);
+  useWorkflowStatus(direction, busy, choosingFile || isDragActive || files.length > 0 || !!password || !!privateKey || enteredPublicKey);
+  useEffect(() => {
+    const input = fileInput.current;
+    if (!buffered || !input) return;
+    const cancel = () => setChoosingFile(false);
+    input.addEventListener("cancel", cancel);
+    return () => input.removeEventListener("cancel", cancel);
+  }, [buffered, step, done]);
   useEffect(() => {
     if (active && (step > 0 || done)) heading.current?.focus();
     // eslint-disable-next-line react-hooks/set-state-in-effect -- Reset sensitive visibility and download UI when the externally controlled workflow step changes.
@@ -148,8 +160,13 @@ export default function FileWorkflow({ direction, active, step, done, buffered =
           <Box sx={{ p: 2.5, border: "2px dashed", borderColor: isDragActive ? "primary.main" : "divider", borderRadius: 3, textAlign: "center" }}>
             <Box sx={{ mb: 2 }}>{files.length ? fileRows(true) : <><DescriptionOutlined sx={{ fontSize: 40, color: "primary.main", mb: 1 }} /><Typography color="text.secondary" variant="body2">{t("drag_drop")}</Typography></>}</Box>
             <input ref={fileInput} id={encrypt ? "enc-file" : "dec-file"} hidden type="file" multiple={!buffered} disabled={busy}
-              onChange={event => { if (event.target.files) onFiles(Array.from(event.target.files)); event.target.value = ""; }} />
-            <Button variant="outlined" disabled={busy} onClick={() => fileInput.current?.click()}>{t(files.length ? buffered ? "change_file" : "add_files" : buffered ? "browse_file" : "browse_files")}</Button>
+              onChange={event => { if (event.target.files) onFiles(Array.from(event.target.files)); event.target.value = ""; setChoosingFile(false); }} />
+            <Button variant="outlined" disabled={busy} onClick={() => {
+              const input = fileInput.current;
+              if (!input) return;
+              if (buffered && "oncancel" in input) setChoosingFile(true);
+              input.click();
+            }}>{t(files.length ? buffered ? "change_file" : "add_files" : buffered ? "browse_file" : "browse_files")}</Button>
           </Box>
           {primary(t(encrypt ? "continue_password" : "continue_file"), onFileContinue, !files.length)}
         </>}

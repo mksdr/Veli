@@ -49,6 +49,7 @@ test("cancelling a real page exit keeps streaming encryption alive", async ({ pa
     };
   });
   await page.goto("/");
+  await expect(page.locator("#enc-file")).toHaveAttribute("multiple", "");
   await page.locator("#enc-file").setInputFiles({ name: "exit-test.txt", mimeType: "text/plain", buffer: plaintext });
   const panel = page.locator("#simple-tabpanel-0");
   await panel.getByRole("button", { name: "Set a password", exact: true }).click();
@@ -168,7 +169,7 @@ test("Firefox streams files in a normal persistent profile", async ({ browserNam
   });
   try {
     const page = await context.newPage();
-    const encrypted = await encrypt(page);
+    const encrypted = await encrypt(page, "/", undefined, { streaming: true });
     await expect(page.getByRole("heading", { name: "Your files are encrypted", exact: true })).toBeVisible();
     // Firefox automation navigation can bypass worker control. Exercise both
     // stream directions within the same controlled page using the app's tab.

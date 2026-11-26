@@ -8,9 +8,11 @@ async function contents(download) {
   return fs.readFile(await download.path());
 }
 
-async function encrypt(page, path = "/", keys) {
+async function encrypt(page, path = "/", keys, { streaming = false } = {}) {
   await page.goto(path);
-  await page.locator("#enc-file").setInputFiles({ name: "한글 document.txt", mimeType: "text/plain", buffer: plaintext });
+  const input = page.locator("#enc-file");
+  if (streaming) await expect(input).toHaveAttribute("multiple", "");
+  await input.setInputFiles({ name: "한글 document.txt", mimeType: "text/plain", buffer: plaintext });
   const panel = page.locator("#simple-tabpanel-0");
   await panel.getByRole("button", { name: "Set a password", exact: true }).last().click();
   if (keys) {

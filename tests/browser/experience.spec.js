@@ -152,10 +152,10 @@ test("stalled streaming can be cancelled without allowing tab or language change
       return post.call(this, data, ...args);
     };
   });
-  await choose(page);
-  if (await page.getByText("This browser processes one file at a time, up to 1 GiB. Available memory may require a smaller file.", { exact: true }).isVisible()) {
-    test.skip(true, "Streaming is unavailable in this context");
-  }
+  await page.goto("/");
+  await expect(page.locator("#enc-file")).toHaveAttribute("multiple", "");
+  await page.locator("#enc-file").setInputFiles(sample);
+  await page.getByRole("button", { name: "Set a password", exact: true }).click();
   await page.getByLabel(/^Password\s*\*?$/).fill("Sample-password-123!");
   await page.getByRole("button", { name: "Review encryption", exact: true }).click();
   await page.getByRole("button", { name: "Encrypt & download", exact: true }).click();

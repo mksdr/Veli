@@ -4,7 +4,7 @@ const os = require('node:os');
 const path = require('node:path');
 const sodium = require('libsodium-wrappers-sumo');
 const { staticServer } = require('../helpers/staticServer');
-const { contents, encrypt, decrypt, plaintext } = require('../helpers/browserFiles');
+const { contents, encrypt, decrypt, password, plaintext } = require('../helpers/browserFiles');
 
 // Firefox automation's ephemeral profiles bypass worker control on navigation.
 const test = base.extend({
@@ -167,6 +167,64 @@ test('first install rejects an HTML response from a different build', async ({ p
     controlled: Boolean(navigator.serviceWorker.controller),
     offlineCaches: (await caches.keys()).filter(name => name.startsWith('veli-offline-')),
   }))).toEqual({ controlled: false, offlineCaches: [] });
+});
+
+test('a slow first precache leaves home usable and enables streaming after the initial timeout', async ({ page, browserName, offlineServer }) => {
+  test.skip(browserName === 'webkit', 'Exercise the desktop streaming eligibility path');
+  const html = await fs.readFile(path.join('out', 'generate-keys', 'index.html'));
+  const { promise, resolve } = Promise.withResolvers();
+  offlineServer.setFile('/generate-keys/', promise);
+  try {
+    await page.clock.install();
+    await page.goto('/?tab=encryption&publicKey=' + encodeURIComponent('+/v7+/v7+/v7+/v7+/v7+/v7+/v7+/v7+/v7+/v7+/s='));
+    await page.waitForFunction(async () => (await navigator.serviceWorker.getRegistration())?.installing?.state === 'installing');
+    await expect(page.getByRole('button', { name: 'Browse File', exact: true })).toBeEnabled({ timeout: 2000 });
+    await expect(page.getByText("Recipient's public key is loaded, please select a file to encrypt.")).toBeVisible();
+    await page.clock.fastForward(5100);
+    expect(await page.evaluate(() => navigator.serviceWorker.controller)).toBeNull();
+    // Firefox reports cancel immediately when Playwright intercepts the picker.
+    if (browserName === 'chromium') {
+      const chooser = page.waitForEvent('filechooser');
+      await page.getByRole('button', { name: 'Browse File', exact: true }).click();
+      await chooser;
+    }
+  } finally {
+    resolve(html);
+  }
+  await expect(page.getByTestId('offline-status')).toHaveAttribute('data-state', 'ready', { timeout: 15000 });
+  if (browserName === 'chromium') {
+    await expect(page.getByRole('button', { name: 'Browse File', exact: true })).toBeEnabled();
+    await page.locator('#enc-file').dispatchEvent('cancel');
+  }
+  await expect(page.locator('#enc-file')).toHaveAttribute('multiple', '', { timeout: 15000 });
+  await expect(page.getByText("Recipient's public key is loaded, please select a file to encrypt.")).toBeVisible();
+});
+
+test('a late claim preserves a headless buffered draft and enables streaming after reset', async ({ page, browserName, offlineServer }) => {
+  test.skip(browserName === 'webkit', 'Exercise the desktop streaming eligibility path');
+  const html = await fs.readFile(path.join('out', 'generate-keys', 'index.html'));
+  const { promise, resolve } = Promise.withResolvers();
+  offlineServer.setFile('/generate-keys/', promise);
+  const file = { name: 'buffered-draft.txt', mimeType: 'text/plain', buffer: plaintext };
+  try {
+    await page.goto('/headless/');
+    await expect(page.getByRole('button', { name: 'Browse File', exact: true })).toBeEnabled({ timeout: 2000 });
+    await page.locator('#enc-file').setInputFiles(file);
+    await page.getByRole('button', { name: 'Set a password', exact: true }).click();
+    await page.getByLabel(/^Password\s*\*?$/).fill(password);
+  } finally {
+    resolve(html);
+  }
+  await expect(page.getByTestId('offline-status')).toHaveAttribute('data-state', 'ready', { timeout: 15000 });
+  await expect(page.getByText(file.name, { exact: true }).filter({ visible: true })).toBeVisible();
+  await expect(page.getByLabel(/^Password\s*\*?$/)).toHaveValue(password);
+  await page.getByRole('button', { name: 'Review encryption', exact: true }).click();
+  await page.getByRole('button', { name: 'Encrypt file', exact: true }).click();
+  const download = page.waitForEvent('download');
+  await page.getByRole('button', { name: 'Download encrypted file', exact: true }).click();
+  expect((await contents(await download)).byteLength).toBeGreaterThan(plaintext.byteLength);
+  await page.getByRole('button', { name: 'Choose another file', exact: true }).click();
+  await expect(page.locator('#enc-file')).toHaveAttribute('multiple', '');
 });
 
 test('reopening online restores an evicted page without reinstalling the worker', async ({ page, context, offlineServer }) => {

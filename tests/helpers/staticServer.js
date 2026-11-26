@@ -32,7 +32,7 @@ async function staticServer({ redirectHtml = false } = {}) {
       const types = { '.html': 'text/html', '.js': 'text/javascript', '.css': 'text/css', '.svg': 'image/svg+xml', '.webmanifest': 'application/manifest+json', '.woff': 'font/woff', '.woff2': 'font/woff2', '.png': 'image/png' };
       response.setHeader('Content-Type', types[path.extname(file)] ?? 'application/octet-stream');
       response.setHeader('Cache-Control', 'no-store');
-      response.end(fileOverrides.get(url.pathname) ?? await fs.readFile(file));
+      response.end(await (fileOverrides.get(url.pathname) ?? fs.readFile(file)));
     } catch { response.writeHead(404).end(); }
   });
   await new Promise(resolve => server.listen(0, '127.0.0.1', resolve));

@@ -30,6 +30,7 @@ test('an update waits for an active download and the installed app reopens offli
     const page = await context.newPage();
     await page.goto('/');
     await expect(page.getByTestId('offline-status')).toHaveAttribute('data-state', 'ready', { timeout: 30000 });
+    await expect(page.locator('#enc-file')).toHaveAttribute('multiple', '');
     const oldName = await page.evaluate(async () => (await caches.keys()).find(name => name.startsWith('veli-offline-')));
     const version = oldName.slice('veli-offline-'.length);
     worker = originalWorker.replace(JSON.stringify(version), JSON.stringify(version + '-update'));

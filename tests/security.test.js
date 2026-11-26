@@ -351,3 +351,29 @@ test("a fulfilled null registration falls back before the next event-loop turn",
   assert.equal(result, false);
   assert.equal(listeners, 0);
 });
+
+for (const [slot, state] of [["installing", "installing"], ["waiting", "installed"], ["active", "activating"]]) {
+  test(`redundancy in the ${slot} slot ends the control wait immediately`, async t => {
+    const worker = Object.assign(new EventTarget(), { state });
+    const serviceWorker = Object.assign(new EventTarget(), { controller: null });
+    const removeWorkerListener = t.mock.method(worker, "removeEventListener");
+    const removeControllerListener = t.mock.method(serviceWorker, "removeEventListener");
+    const registration = { installing: null, waiting: null, active: null, [slot]: worker };
+    const pending = waitForWorkerControl({ serviceWorker }, 1000, async () => registration);
+    await new Promise(resolve => setImmediate(resolve));
+    worker.state = "redundant";
+    worker.dispatchEvent(new Event("statechange"));
+    const result = await Promise.race([pending, new Promise(resolve => setImmediate(() => resolve("still waiting")))]);
+    assert.equal(result, false);
+    assert.equal(removeWorkerListener.mock.callCount(), 1);
+    assert.equal(removeControllerListener.mock.callCount(), 1);
+  });
+}
+
+test("a registration whose failed install was already cleared ends the control wait immediately", async () => {
+  const serviceWorker = new EventTarget();
+  const registration = { installing: null, waiting: null, active: null };
+  const pending = waitForWorkerControl({ serviceWorker }, 1000, async () => registration);
+  const result = await Promise.race([pending, new Promise(resolve => setImmediate(() => resolve("still waiting")))]);
+  assert.equal(result, false);
+});
