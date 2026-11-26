@@ -4,24 +4,22 @@ import { registerAppWorker } from "../utils/appWorker";
 import { getTranslations as t } from "../../locales";
 
 type OfflineStatus = "preparing" | "ready" | "unavailable";
-type HomeScreenMode = "browser" | "app" | null;
 const OfflineContext = createContext({ online: true });
 export const useOnlineStatus = () => useContext(OfflineContext).online;
 
-function getHomeScreenMode(): HomeScreenMode {
-  if (window.top !== window) return null;
+function isHomeScreenApp(): boolean {
+  if (window.top !== window) return false;
   const device = navigator as Navigator & { standalone?: boolean };
   // iPadOS can identify itself as a Mac when requesting desktop websites.
   const appleMobile = /iPhone|iPad|iPod/i.test(device.userAgent) ||
     (device.platform === "MacIntel" && device.maxTouchPoints > 1);
-  if (!appleMobile) return null;
-  return device.standalone || window.matchMedia("(display-mode: standalone)").matches ? "app" : "browser";
+  return appleMobile && (device.standalone === true || window.matchMedia("(display-mode: standalone)").matches);
 }
 
 export default function OfflineProvider({ children }: { children: ReactNode }) {
   const [online, setOnline] = useState(true);
   const [status, setStatus] = useState<OfflineStatus>("preparing");
-  const [homeScreenMode, setHomeScreenMode] = useState<HomeScreenMode>(null);
+  const [homeScreenApp, setHomeScreenApp] = useState(false);
   // Read browser-only capabilities after hydration; keep the static render deterministic.
   useEffect(() => {
     let disposed = false;
@@ -89,7 +87,7 @@ export default function OfflineProvider({ children }: { children: ReactNode }) {
     };
     updateOnline();
     // eslint-disable-next-line react-hooks/set-state-in-effect -- Safari exposes the launch mode on the client.
-    setHomeScreenMode(getHomeScreenMode());
+    setHomeScreenApp(isHomeScreenApp());
     window.addEventListener("online", updateOnline);
     window.addEventListener("offline", updateOnline);
     registerAppWorker().then(result => {
@@ -115,10 +113,7 @@ export default function OfflineProvider({ children }: { children: ReactNode }) {
       <Typography component="p" variant="caption" color="text.secondary" role="status" data-testid="offline-status" data-state={status}>
         {t(status === "ready" ? "pwa_ready" : status === "preparing" ? "pwa_preparing" : "pwa_unavailable")}
       </Typography>
-      {homeScreenMode === "browser" && (
-        <Typography component="p" variant="caption" color="text.secondary">{t("pwa_home_screen_setup")}</Typography>
-      )}
-      {homeScreenMode === "app" && status === "preparing" && (
+      {homeScreenApp && status === "preparing" && (
         <Typography component="p" variant="caption" color="text.secondary">{t("pwa_home_screen_preparing")}</Typography>
       )}
     </Box>

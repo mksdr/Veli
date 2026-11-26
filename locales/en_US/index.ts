@@ -2,7 +2,6 @@ const en_US = {
   "pwa_preparing": "Preparing for offline use…",
   "pwa_ready": "Ready for offline use",
   "pwa_unavailable": "Offline use is unavailable. Connect and reopen Veli to try again.",
-  "pwa_home_screen_setup": "If you add Veli to your Home Screen, open it from its icon while online and wait for “Ready for offline use” there.",
   "pwa_home_screen_preparing": "Keep Veli open and connected until it’s ready for offline use.",
   "pwa_about_online": "Help requires an internet connection.",
 
@@ -75,7 +74,6 @@ const en_US = {
   "offline_note": "Your files stay in this browser. They are not uploaded to a server.",
   "very_weak": "Very Weak (guessable)",
   "weak": "Weak",
-  "password_strength_hint": "Strength depends on common passwords and patterns as well as length. Adding numbers can still leave a password easy to guess. Combine several unrelated words or create a password below.",
   "moderate": "Moderate",
   "good": "Good",
   "strong": "Strong",

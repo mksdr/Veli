@@ -309,11 +309,9 @@ test('the iPhone and iPad Home Screen app prepares on its first online launch', 
   await expect(reopened.locator('#enc-file')).toBeAttached();
 });
 
-test('prepares unvisited pages, reloads offline, and keeps About online only', async ({ page, context, offlineServer, browserName }, testInfo) => {
+test('prepares unvisited pages, reloads offline, and keeps About online only', async ({ page, context, offlineServer, browserName }) => {
   await prepare(page);
-  const homeScreenSetup = page.getByText('If you add Veli to your Home Screen,', { exact: false });
-  if (['iphone-webkit', 'ipad-webkit'].includes(testInfo.project.name)) await expect(homeScreenSetup).toBeVisible();
-  else await expect(homeScreenSetup).toHaveCount(0);
+  await expect(page.getByText('If you add Veli to your Home Screen,')).toHaveCount(0);
   const cachePaths = await page.evaluate(async () => {
     const paths = [];
     for (const name of await caches.keys()) {

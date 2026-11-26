@@ -4,7 +4,6 @@ const ko_KR: Translations = {
   "pwa_preparing": "오프라인 사용을 준비하고 있어요…",
   "pwa_ready": "오프라인에서 사용할 준비가 완료됐어요",
   "pwa_unavailable": "오프라인 사용을 준비하지 못했어요. 인터넷에 연결하고 Veli를 다시 열어주세요.",
-  "pwa_home_screen_setup": "Veli를 홈 화면에 추가했다면 인터넷에 연결된 상태에서 홈 화면 아이콘으로 열고 오프라인 준비가 완료될 때까지 기다려주세요.",
   "pwa_home_screen_preparing": "오프라인 준비가 완료될 때까지 인터넷에 연결된 상태로 Veli를 열어두세요.",
   "pwa_about_online": "도움말을 보려면 인터넷 연결이 필요해요.",
 
@@ -77,7 +76,6 @@ const ko_KR: Translations = {
   "offline_note": "파일은 이 브라우저에서 처리하며 서버에 업로드하지 않아요.",
   "very_weak": "매우 약해요",
   "weak": "약해요",
-  "password_strength_hint": "길이뿐 아니라 흔한 비밀번호와 패턴도 평가해요. 숫자를 덧붙여도 쉽게 추측될 수 있으니, 관련 없는 여러 단어를 조합하거나 아래에서 비밀번호를 만들어보세요.",
   "moderate": "적절해요",
   "good": "좋아요",
   "strong": "강해요",

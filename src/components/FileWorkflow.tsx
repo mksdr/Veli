@@ -185,10 +185,9 @@ export default function FileWorkflow({ direction, active, step, done, buffered =
                 </Tooltip></InputAdornment> }} />
             {passwordError && errorFile && files.length > 1 && <Typography variant="body2" color="error">{errorFile}</Typography>}
             {encrypt && <>
-              {!!password && <Box>
+              {!!password && (
                 <Typography variant="body2" color="text.secondary">{t("password_strength")}: {passwordStrengthCheck(password)[0]}</Typography>
-                <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>{t("password_strength_hint")}</Typography>
-              </Box>}
+              )}
               <Stack spacing={1} direction={{ xs: "column", sm: "row" }}>
                 <Select size="small" value={generation} onChange={(event: SelectChangeEvent<PasswordGenerationKind>) => setGeneration(event.target.value as PasswordGenerationKind)} disabled={busy} inputProps={{ "aria-label": t("generate_password") }} sx={{ flex: 1 }}>
                   <MenuItem value="random">{t("random_password")}</MenuItem><MenuItem value="words">{t("word_password")}</MenuItem>
