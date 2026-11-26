@@ -79,18 +79,14 @@ export default function OfflineProvider({ children }: { children: ReactNode }) {
     setHomeScreenMode(getHomeScreenMode());
     window.addEventListener("online", updateOnline);
     window.addEventListener("offline", updateOnline);
-    if ("serviceWorker" in navigator && window.isSecureContext) {
+    registerAppWorker().then(result => {
+      if (disposed) return;
+      registration = result;
+      if (!result) { setStatus("unavailable"); return; }
       navigator.serviceWorker.addEventListener("controllerchange", check);
-      registerAppWorker().then(result => {
-        if (disposed) return;
-        registration = result;
-        if (!result) { setStatus("unavailable"); return; }
-        result.addEventListener("updatefound", watch);
-        watch(); changed();
-      });
-    } else {
-      setStatus("unavailable");
-    }
+      result.addEventListener("updatefound", watch);
+      watch(); changed();
+    });
     return () => {
       disposed = true;
       window.removeEventListener("online", updateOnline);
