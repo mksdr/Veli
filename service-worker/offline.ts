@@ -23,8 +23,8 @@ export function installOffline(scope: ServiceWorkerGlobalScope, precache: Record
   if (!paths.length) return;
   const cacheName = prefix + version;
   const allowed = new Set(paths);
-  const request = (path: string, integrity?: string) =>
-    new Request(new URL(path, scope.location.origin), { cache: "reload", integrity });
+  const request = (path: string) =>
+    new Request(new URL(path, scope.location.origin), { cache: "reload", integrity: precache[path] });
   const missingPaths = async (cache: Cache) => {
     const keys = new Set((await cache.keys()).map(request => new URL(request.url).pathname));
     return paths.filter(path => !keys.has(path));
@@ -43,8 +43,8 @@ export function installOffline(scope: ServiceWorkerGlobalScope, precache: Record
     event.waitUntil((async () => {
       const cache = await caches.open(cacheName);
       try {
-        // Fetch with revalidation disabled so a deployment cannot reuse stale HTML.
-        await cache.addAll(paths.map(path => request(path)));
+        // Require every response to match this build, even during a deployment.
+        await cache.addAll(paths.map(request));
       } catch (error) {
         await caches.delete(cacheName);
         throw error;
@@ -71,7 +71,7 @@ export function installOffline(scope: ServiceWorkerGlobalScope, precache: Record
           port.postMessage({ repairing: true });
           // An active worker may serve an older build while an update waits.
           // Only restore responses whose bytes match this worker's build.
-          repair ??= cache.addAll(missing.map(path => request(path, precache[path])))
+          repair ??= cache.addAll(missing.map(request))
             .finally(() => { repair = undefined; });
           await repair;
           ready = (await missingPaths(await caches.open(cacheName))).length === 0;

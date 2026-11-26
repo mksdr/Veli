@@ -34,7 +34,7 @@ test('an update waits for an active download and the installed app reopens offli
     const version = oldName.slice('veli-offline-'.length);
     worker = originalWorker.replace(JSON.stringify(version), JSON.stringify(version + '-update'));
     expect(worker).not.toBe(originalWorker);
-    server.setWorker(worker);
+    server.setFile('/service-worker.js', worker);
     await page.locator('#enc-file').setInputFiles({ name: 'updating.txt', mimeType: 'text/plain', buffer: plaintext });
     await page.getByRole('button', { name: 'Set a password', exact: true }).click();
     await page.locator('#encrypt-password').fill(password);

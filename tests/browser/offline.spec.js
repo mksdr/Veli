@@ -43,6 +43,23 @@ async function downloadDecrypted(page, panel) {
   expect(await contents(await download)).toEqual(plaintext);
 }
 
+test('first install rejects an HTML response from a different build', async ({ page, offlineServer }) => {
+  const otherBuildHtml = '<!doctype html><title>Veli from another build</title>';
+  offlineServer.setFile('/generate-keys/', otherBuildHtml);
+  const response = await page.request.get('/generate-keys/index.html');
+  expect(response.status()).toBe(200);
+  expect(await response.text()).toBe(otherBuildHtml);
+
+  await page.goto('/');
+  const status = page.getByTestId('offline-status');
+  await expect(status).toHaveAttribute('data-state', /^(ready|unavailable)$/, { timeout: 30000 });
+  expect(await status.getAttribute('data-state')).toBe('unavailable');
+  expect(await page.evaluate(async () => ({
+    controlled: Boolean(navigator.serviceWorker.controller),
+    offlineCaches: (await caches.keys()).filter(name => name.startsWith('veli-offline-')),
+  }))).toEqual({ controlled: false, offlineCaches: [] });
+});
+
 test('reopening online restores an evicted page without reinstalling the worker', async ({ page, context, offlineServer }) => {
   await prepare(page);
   await page.evaluate(async () => {

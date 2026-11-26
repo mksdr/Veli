@@ -5,7 +5,7 @@ const path = require('node:path');
 async function staticServer({ redirectHtml = false } = {}) {
   const root = path.resolve('out');
   let connected = true;
-  let worker;
+  const fileOverrides = new Map();
   const server = createServer(async (request, response) => {
     if (!connected) { request.socket.destroy(); return; }
     try {
@@ -32,14 +32,14 @@ async function staticServer({ redirectHtml = false } = {}) {
       const types = { '.html': 'text/html', '.js': 'text/javascript', '.css': 'text/css', '.svg': 'image/svg+xml', '.webmanifest': 'application/manifest+json', '.woff': 'font/woff', '.woff2': 'font/woff2', '.png': 'image/png' };
       response.setHeader('Content-Type', types[path.extname(file)] ?? 'application/octet-stream');
       response.setHeader('Cache-Control', 'no-store');
-      response.end(url.pathname === '/service-worker.js' && worker ? worker : await fs.readFile(file));
+      response.end(fileOverrides.get(url.pathname) ?? await fs.readFile(file));
     } catch { response.writeHead(404).end(); }
   });
   await new Promise(resolve => server.listen(0, '127.0.0.1', resolve));
   return {
     baseURL: `http://127.0.0.1:${server.address().port}`,
     setConnected(value) { connected = value; },
-    setWorker(value) { worker = value; },
+    setFile(urlPath, body) { fileOverrides.set(urlPath, body); },
     close: () => new Promise(resolve => server.close(resolve)),
   };
 }
