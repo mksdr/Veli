@@ -23,13 +23,18 @@ async function buildOfflineWorker(root) {
   const sandbox = { self: {} };
   vm.runInNewContext(manifestText, sandbox, { timeout: 1000 });
   const manifest = sandbox.self.__BUILD_MANIFEST;
+  const aboutAssets = manifest?.["/about"];
+  if (!Array.isArray(aboutAssets) || aboutAssets.length === 0 ||
+      aboutAssets.some(asset => typeof asset !== "string" || !asset.startsWith("static/") || !files.includes("_next/" + asset))) {
+    throw new Error("Invalid Next.js _buildManifest.js: expected /about to list exported static assets");
+  }
   const shared = new Set(Object.entries(manifest)
     .filter(([route, value]) => route !== "/about" && Array.isArray(value))
     .flatMap(([, value]) => value));
-  const aboutOnly = new Set((manifest["/about"] ?? []).filter(file => !shared.has(file)));
+  const aboutOnly = new Set(aboutAssets.filter(file => !shared.has(file)));
   const precache = files.filter(file => {
     if (["index.html", "headless/index.html", "generate-keys/index.html", "offline.html", "manifest.webmanifest", "favicon.ico", "favicon.svg"].includes(file)) return true;
-    if (file.startsWith("assets/")) return true;
+    if (file.startsWith("assets/icons/")) return true;
     if (file.startsWith("_next/static/")) return !file.endsWith(".map") && !aboutOnly.has(file.slice("_next/".length));
     return file.startsWith("_next/data/") && /\/(index|headless|generate-keys)\.json$/.test(file);
   });

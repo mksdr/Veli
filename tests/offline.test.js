@@ -1,11 +1,28 @@
 const { test } = require('node:test');
 const assert = require('node:assert/strict');
+const { mkdir, mkdtemp, rm, writeFile } = require('node:fs/promises');
+const { tmpdir } = require('node:os');
+const { join } = require('node:path');
+const { buildOfflineWorker } = require('../scripts/build-offline.js');
 const { installOffline } = require('../service-worker/offline.ts');
 const precache = {
   '/index.html': 'sha256-home',
   '/headless/index.html': 'sha256-headless',
   '/offline.html': 'sha256-offline',
 };
+
+test('the offline build rejects an invalid About bundle list', async t => {
+  const root = await mkdtemp(join(tmpdir(), 'veli-offline-build-'));
+  t.after(() => rm(root, { recursive: true, force: true }));
+  const manifestDir = join(root, '_next/static/test-build');
+  await mkdir(manifestDir, { recursive: true });
+  await writeFile(join(root, 'index.html'), '<script id="__NEXT_DATA__">{"buildId":"test-build"}</script>');
+
+  for (const manifest of [{}, { '/about': {} }, { '/about': [] }, { '/about': ['static/chunks/missing.js'] }]) {
+    await writeFile(join(manifestDir, '_buildManifest.js'), `self.__BUILD_MANIFEST = ${JSON.stringify(manifest)};`);
+    await assert.rejects(buildOfflineWorker(root), /_buildManifest\.js.*\/about/);
+  }
+});
 
 function harness(version = 'new') {
   const handlers = {};

@@ -330,6 +330,21 @@ test('prepares unvisited pages, reloads offline, and keeps About online only', a
   })).toBe(true);
   expect(cachePaths).toEqual(expect.arrayContaining(['/index.html', '/headless/index.html', '/generate-keys/index.html']));
   expect(cachePaths.some(url => /about|\/file(?:\?|$)/.test(url))).toBe(false);
+  expect(cachePaths.some(url => url.startsWith('/assets/styles/'))).toBe(false);
+  expect(cachePaths.some(url => url.startsWith('/_next/static/css/'))).toBe(true);
+  expect(cachePaths.some(url => url.startsWith('/_next/static/media/') && url.endsWith('.woff2'))).toBe(true);
+
+  // Compare the exported pages to detect About-only chunks even when their names are hashed.
+  const [aboutScripts, ...offlineScripts] = await Promise.all([
+    'about/index.html', 'index.html', 'headless/index.html', 'generate-keys/index.html',
+  ].map(async file => {
+    const html = await fs.readFile(path.join('out', file), 'utf8');
+    return Array.from(html.matchAll(/<script\b[^>]*\bsrc="(\/_next\/static\/chunks\/[^"]+)"/g), match => match[1]);
+  }));
+  const sharedScripts = new Set(offlineScripts.flat());
+  const aboutOnly = aboutScripts.filter(url => !sharedScripts.has(url));
+  expect(aboutOnly.length).toBeGreaterThan(0);
+  expect(cachePaths.filter(url => aboutOnly.includes(url))).toEqual([]);
   await disconnect(context, offlineServer);
   const icons = await page.evaluate(async () => {
     const manifest = await fetch(document.querySelector('link[rel="manifest"]').href).then(response => response.json());
