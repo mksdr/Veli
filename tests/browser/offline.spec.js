@@ -170,6 +170,20 @@ for (const controlled of [false, true]) {
   });
 }
 
+test('a first claim can arrive before the client sees the worker state change', async ({ page, browserName }) => {
+  test.skip(browserName === 'webkit', 'Exercise the desktop streaming eligibility path');
+  await openWithWorkerState(page, { slot: 'active', state: 'installing', controlled: true });
+  await expect(page.locator('#enc-file')).toBeAttached();
+  await page.evaluate(() => {
+    const { worker } = window.workerFixture;
+    worker.state = 'activated';
+    worker.dispatchEvent(new Event('statechange'));
+  });
+  await expect.poll(() => page.evaluate(() => window.workerFixture.protocolRequests.length)).toBe(1);
+  await page.evaluate(() => window.workerFixture.protocolRequests[0].postMessage({ version: 1 }));
+  await expect(page.locator('#enc-file')).toHaveAttribute('multiple', '');
+});
+
 async function downloadDecrypted(page, panel) {
   const download = page.waitForEvent('download');
   const stream = panel.getByRole('button', { name: 'Decrypt & download', exact: true });
@@ -178,7 +192,7 @@ async function downloadDecrypted(page, panel) {
   expect(await contents(await download)).toEqual(plaintext);
 }
 
-test('first install rejects an HTML response from a different build', async ({ page, offlineServer }) => {
+test('rejects a mismatched offline asset while the active worker still streams and can retry', async ({ page, context, browserName, offlineServer }) => {
   const otherBuildHtml = '<!doctype html><title>Veli from another build</title>';
   offlineServer.setFile('/generate-keys/', otherBuildHtml);
   const response = await page.request.get('/generate-keys/index.html');
@@ -187,60 +201,72 @@ test('first install rejects an HTML response from a different build', async ({ p
 
   await page.goto('/');
   const status = page.getByTestId('offline-status');
-  await expect(status).toHaveAttribute('data-state', /^(ready|unavailable)$/, { timeout: 30000 });
-  expect(await status.getAttribute('data-state')).toBe('unavailable');
+  await expect(status).toHaveAttribute('data-state', 'unavailable', { timeout: 30000 });
   expect(await page.evaluate(async () => ({
     controlled: Boolean(navigator.serviceWorker.controller),
-    offlineCaches: (await caches.keys()).filter(name => name.startsWith('veli-offline-')),
-  }))).toEqual({ controlled: false, offlineCaches: [] });
+    cached: Boolean(await caches.match('/generate-keys/index.html')),
+  }))).toEqual({ controlled: true, cached: false });
+
+  if (browserName !== 'webkit') {
+    await expect(page.locator('#enc-file')).toHaveAttribute('multiple', '');
+  }
+  if (browserName === 'chromium') {
+    const encrypted = await encrypt(page, '/', undefined, { streaming: true });
+    const panel = await decrypt(page, encrypted, '/', undefined, false);
+    const button = panel.getByRole('button', { name: 'Decrypt & download', exact: true });
+    await expect(button).toBeVisible();
+    const download = page.waitForEvent('download');
+    await button.click();
+    expect(await contents(await download)).toEqual(plaintext);
+    await expect(status).toHaveAttribute('data-state', 'unavailable');
+  }
+
+  await page.evaluate(() => { window.initialWorker = navigator.serviceWorker.controller; });
+  offlineServer.setFile('/generate-keys/', await fs.readFile(path.join('out', 'generate-keys', 'index.html')));
+  const reopened = await context.newPage();
+  await prepare(reopened);
+  expect(await page.evaluate(async () => {
+    const { active } = await navigator.serviceWorker.getRegistration();
+    return active === window.initialWorker && active === navigator.serviceWorker.controller;
+  })).toBe(true);
 });
 
-test('a slow first precache leaves home usable and enables streaming after the initial timeout', async ({ page, browserName, offlineServer }) => {
+test('a slow first precache leaves streaming usable while offline preparation is pending', async ({ page, browserName, offlineServer }) => {
   test.skip(browserName === 'webkit', 'Exercise the desktop streaming eligibility path');
   const html = await fs.readFile(path.join('out', 'generate-keys', 'index.html'));
   const { promise, resolve } = Promise.withResolvers();
   offlineServer.setFile('/generate-keys/', promise);
   try {
-    await page.clock.install();
     await page.goto('/?tab=encryption&publicKey=' + encodeURIComponent('+/v7+/v7+/v7+/v7+/v7+/v7+/v7+/v7+/v7+/v7+/s='));
-    await page.waitForFunction(async () => (await navigator.serviceWorker.getRegistration())?.installing?.state === 'installing');
-    await expect(page.getByRole('button', { name: 'Browse File', exact: true })).toBeEnabled({ timeout: 2000 });
+    await expect(page.locator('#enc-file')).toHaveAttribute('multiple', '', { timeout: 15000 });
+    await expect(page.getByTestId('offline-status')).toHaveAttribute('data-state', 'preparing');
     await expect(page.getByText("Recipient's public key is loaded, please select a file to encrypt.")).toBeVisible();
-    await page.clock.fastForward(5100);
-    expect(await page.evaluate(() => navigator.serviceWorker.controller)).toBeNull();
-    // Firefox reports cancel immediately when Playwright intercepts the picker.
-    if (browserName === 'chromium') {
-      const chooser = page.waitForEvent('filechooser');
-      await page.getByRole('button', { name: 'Browse File', exact: true }).click();
-      await chooser;
-    }
   } finally {
     resolve(html);
   }
   await expect(page.getByTestId('offline-status')).toHaveAttribute('data-state', 'ready', { timeout: 15000 });
-  if (browserName === 'chromium') {
-    await expect(page.getByRole('button', { name: 'Browse File', exact: true })).toBeEnabled();
-    await page.locator('#enc-file').dispatchEvent('cancel');
-  }
-  await expect(page.locator('#enc-file')).toHaveAttribute('multiple', '', { timeout: 15000 });
-  await expect(page.getByText("Recipient's public key is loaded, please select a file to encrypt.")).toBeVisible();
 });
 
-test('a late claim preserves a headless buffered draft and enables streaming after reset', async ({ page, browserName, offlineServer }) => {
+test('a late protocol reply preserves a headless buffered draft and enables streaming after reset', async ({ page, browserName }) => {
   test.skip(browserName === 'webkit', 'Exercise the desktop streaming eligibility path');
-  const html = await fs.readFile(path.join('out', 'generate-keys', 'index.html'));
-  const { promise, resolve } = Promise.withResolvers();
-  offlineServer.setFile('/generate-keys/', promise);
+  await page.addInitScript(() => {
+    const post = ServiceWorker.prototype.postMessage;
+    ServiceWorker.prototype.postMessage = function (data, ...args) {
+      if (data.cmd === 'getProtocolVersion') {
+        window.resumeProtocol = () => post.call(this, data, ...args);
+        return;
+      }
+      return post.call(this, data, ...args);
+    };
+  });
   const file = { name: 'buffered-draft.txt', mimeType: 'text/plain', buffer: plaintext };
-  try {
-    await page.goto('/headless/');
-    await expect(page.getByRole('button', { name: 'Browse File', exact: true })).toBeEnabled({ timeout: 2000 });
-    await page.locator('#enc-file').setInputFiles(file);
-    await page.getByRole('button', { name: 'Set a password', exact: true }).click();
-    await page.getByLabel(/^Password\s*\*?$/).fill(password);
-  } finally {
-    resolve(html);
-  }
+  await page.goto('/headless/');
+  await expect(page.getByRole('button', { name: 'Browse File', exact: true })).toBeEnabled();
+  await page.locator('#enc-file').setInputFiles(file);
+  await page.getByRole('button', { name: 'Set a password', exact: true }).click();
+  await page.getByLabel(/^Password\s*\*?$/).fill(password);
+  await page.waitForFunction(() => !!window.resumeProtocol, undefined, { timeout: 15000 });
+  await page.evaluate(() => window.resumeProtocol());
   await expect(page.getByTestId('offline-status')).toHaveAttribute('data-state', 'ready', { timeout: 15000 });
   await expect(page.getByText(file.name, { exact: true }).filter({ visible: true })).toBeVisible();
   await expect(page.getByLabel(/^Password\s*\*?$/)).toHaveValue(password);

@@ -24,13 +24,13 @@ test('the offline build rejects an invalid About bundle list', async t => {
   }
 });
 
-function harness(version = 'new') {
+function harness({ active = null, version = 'new' } = {}) {
   const handlers = {};
   const stores = new Map();
   const deleted = [];
   const batches = [];
   let failFetch = false;
-  const scope = { location: { origin: 'https://veli.test' }, addEventListener(type, handler) { handlers[type] = handler; } };
+  const scope = { registration: { active }, location: { origin: 'https://veli.test' }, addEventListener(type, handler) { handlers[type] = handler; } };
   global.caches = {
     async open(name) {
       if (!stores.has(name)) stores.set(name, new Map());
@@ -80,8 +80,21 @@ function harness(version = 'new') {
   return { handlers, stores, deleted, batches, event, fetch, status, setFailFetch(value) { failFetch = value; } };
 }
 
-test('failed precaching removes the partial new cache and keeps old and foreign caches', async () => {
+test('first installation leaves precaching to the active worker status check', async () => {
   const h = harness();
+  h.setFailFetch(true);
+  await h.event('install');
+  assert.deepEqual(h.batches, []);
+  assert.equal(h.stores.size, 0);
+  assert.deepEqual(await h.status(true), [{ repairing: true }, { ready: false }]);
+  assert.equal(h.stores.get('veli-offline-new').size, 0);
+
+  h.setFailFetch(false);
+  assert.deepEqual(await h.status(true), [{ repairing: true }, { ready: true }]);
+});
+
+test('failed update precaching removes the partial new cache and keeps old and foreign caches', async () => {
+  const h = harness({ active: {} });
   h.setFailFetch(true);
   h.stores.set('veli-offline-old', new Map());
   h.stores.set('veli-offline-new', new Map([['/index.html', new Response('partial')]]));
@@ -89,6 +102,15 @@ test('failed precaching removes the partial new cache and keeps old and foreign 
   await assert.rejects(h.event('install'), /Network lost/);
   assert.deepEqual([...h.stores.keys()], ['veli-offline-old', 'another-app']);
 });
+
+for (const operation of ['keys', 'delete']) {
+  test(`a cache cleanup ${operation} error does not reject activation`, async t => {
+    const h = harness();
+    h.stores.set('veli-offline-old', new Map());
+    t.mock.method(caches, operation, async () => { throw new Error('Cache Storage unavailable'); });
+    await h.event('activate');
+  });
+}
 
 test('activation cleans only previous Veli caches, and readiness checks actual cached entries', async () => {
   const h = harness();
@@ -142,7 +164,7 @@ test('development builds install no offline event handlers', () => {
 
 test('a complete cache serves redirected HTML without a network request or lost headers/body', async t => {
   const h = harness();
-  await h.event('install');
+  await h.status(true);
   const cached = new Response('redirected HTML', { headers: { 'Content-Type': 'text/html; charset=utf-8', 'X-Test': 'preserved' } });
   Object.defineProperty(cached, 'redirected', { value: true });
   h.stores.get('veli-offline-new').set('/index.html', cached);
@@ -158,7 +180,7 @@ test('a complete cache serves redirected HTML without a network request or lost 
 
 test('an incomplete cache prefers the network and falls back to the cached page offline', async t => {
   const h = harness();
-  await h.event('install');
+  await h.status(true);
   const cache = h.stores.get('veli-offline-new');
   cache.delete('/headless/index.html');
   const cached = new Response('old page');
@@ -180,10 +202,35 @@ test('an incomplete cache prefers the network and falls back to the cached page 
   await assert.rejects(h.fetch('/headless/', { mode: 'navigate' }), /Network lost/);
 });
 
+test('an incomplete cache falls back on HTTP errors and passes through redirects', async t => {
+  const h = harness();
+  const cached = new Response('old page');
+  Object.defineProperty(cached, 'redirected', { value: true });
+  h.stores.set('veli-offline-new', new Map([['/index.html', cached]]));
+  const network = t.mock.method(globalThis, 'fetch');
+  const navigation = { mode: 'navigate' };
+
+  for (const status of [404, 503]) {
+    network.mock.mockImplementation(async () => new Response('HTTP error', { status }));
+    const fallback = await h.fetch('/', navigation);
+    assert.equal(fallback.redirected, false);
+    assert.equal(fallback.status, 200);
+    assert.equal(await fallback.text(), 'old page');
+
+    const uncached = await h.fetch('/headless/', navigation);
+    assert.equal(uncached.status, status);
+    assert.equal(await uncached.text(), 'HTTP error');
+  }
+
+  const redirect = Response.redirect('https://veli.test/headless/', 308);
+  network.mock.mockImplementation(async () => redirect);
+  assert.equal(await h.fetch('/', navigation), redirect);
+});
+
 for (const operation of ['open', 'match', 'keys']) {
   test(`a cache ${operation} error falls back to the original navigation request`, async t => {
     const h = harness();
-    await h.event('install');
+    await h.status(true);
     const open = caches.open;
     t.mock.method(caches, 'open', async name => {
       if (operation === 'open') throw new Error('Cache storage unavailable');

@@ -31,8 +31,8 @@ export default function useFileProcessingSupport(): boolean | null {
       const controller = workers.controller;
       if (controller?.state !== "activated") {
         setStreaming(current => current ?? false);
-        if (controller?.state === "activating") {
-          // The worker can claim the page before its activation work finishes.
+        if (controller && controller.state !== "redundant") {
+          // The control event can arrive before the client sees the latest worker state.
           activatingWorker = controller;
           controller.addEventListener("statechange", checkController);
         }

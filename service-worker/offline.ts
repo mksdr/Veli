@@ -40,6 +40,9 @@ export function installOffline(scope: ServiceWorkerGlobalScope, precache: Record
   let repair: Promise<void> | undefined;
 
   scope.addEventListener("install", event => {
+    // The first worker can serve streaming downloads before its offline cache is ready.
+    // An update must prepare its cache before it can replace the active worker.
+    if (!scope.registration.active) return;
     event.waitUntil((async () => {
       const cache = await caches.open(cacheName);
       try {
@@ -56,7 +59,9 @@ export function installOffline(scope: ServiceWorkerGlobalScope, precache: Record
       for (const key of await caches.keys()) {
         if (key.startsWith(prefix) && key !== cacheName) await caches.delete(key);
       }
-    })());
+    })().catch(() => {
+      // Cache Storage errors must not prevent the worker from taking control.
+    }));
   });
   scope.addEventListener("message", event => {
     const port = event.ports[0];
@@ -69,8 +74,7 @@ export function installOffline(scope: ServiceWorkerGlobalScope, precache: Record
         ready = missing.length === 0;
         if (!ready && event.data.repair === true) {
           port.postMessage({ repairing: true });
-          // An active worker may serve an older build while an update waits.
-          // Only restore responses whose bytes match this worker's build.
+          // Initial preparation and repair both require this worker's build.
           repair ??= cache.addAll(missing.map(request))
             .finally(() => { repair = undefined; });
           await repair;
@@ -105,7 +109,8 @@ export function installOffline(scope: ServiceWorkerGlobalScope, precache: Record
         }
         // A newer deployment may no longer serve the old page's missing chunks.
         try {
-          return withoutRedirectHistory(await fetch(event.request, { cache: "reload" }));
+          const response = await fetch(event.request, { cache: "reload" });
+          return withoutRedirectHistory(response.status >= 400 && cached ? cached : response);
         } catch (error) {
           if (!cached) throw error;
           return withoutRedirectHistory(cached);
