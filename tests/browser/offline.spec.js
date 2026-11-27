@@ -286,7 +286,7 @@ test('reopening online restores an evicted page without reinstalling the worker'
   await prepare(page);
   await page.evaluate(async () => {
     window.initialWorker = navigator.serviceWorker.controller;
-    const name = (await caches.keys()).find(key => key.startsWith('veli-offline-'));
+    const name = (await caches.keys()).find(key => key.startsWith('veli-precache-'));
     const cache = await caches.open(name);
     if (!await cache.delete('/generate-keys/index.html')) throw new Error('Expected a cached key generation page');
   });
@@ -310,7 +310,7 @@ test('an incomplete old cache opens the latest page online without replacing cac
     fs.readFile(path.join('out', oldChunk)),
   ]);
   expect(await page.evaluate(async chunk => {
-    const name = (await caches.keys()).find(key => key.startsWith('veli-offline-'));
+    const name = (await caches.keys()).find(key => key.startsWith('veli-precache-'));
     return (await caches.open(name)).delete(chunk);
   }, oldChunk)).toBe(true);
   offlineServer.setFile(oldChunk, null);
@@ -325,7 +325,7 @@ test('an incomplete old cache opens the latest page online without replacing cac
   await expect(reopened.locator('#dec-file')).toBeAttached();
   await expect(reopened.getByTestId('offline-status')).toHaveAttribute('data-state', 'unavailable');
   const cachedHtml = await reopened.evaluate(async () => {
-    const name = (await caches.keys()).find(key => key.startsWith('veli-offline-'));
+    const name = (await caches.keys()).find(key => key.startsWith('veli-precache-'));
     return (await (await caches.open(name)).match('/index.html')).text();
   });
   expect(cachedHtml).toBe(oldHtml);
@@ -374,7 +374,7 @@ test('prepares unvisited pages, reloads offline, and keeps About online only', a
   const cachePaths = await page.evaluate(async () => {
     const paths = [];
     for (const name of await caches.keys()) {
-      if (name.startsWith('veli-offline-')) {
+      if (name.startsWith('veli-precache-')) {
         for (const request of await (await caches.open(name)).keys()) paths.push(new URL(request.url).pathname);
       }
     }
@@ -382,7 +382,7 @@ test('prepares unvisited pages, reloads offline, and keeps About online only', a
   });
   // Model Pages hosting: these cache entries came from followed HTML redirects.
   expect(await page.evaluate(async () => {
-    const name = (await caches.keys()).find(key => key.startsWith('veli-offline-'));
+    const name = (await caches.keys()).find(key => key.startsWith('veli-precache-'));
     return (await (await caches.open(name)).match('/index.html')).redirected;
   })).toBe(true);
   expect(cachePaths).toEqual(expect.arrayContaining(['/index.html', '/headless/index.html', '/generate-keys/index.html']));

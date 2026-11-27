@@ -31,8 +31,8 @@ test('an update waits for an active download and the installed app reopens offli
     await page.goto('/');
     await expect(page.getByTestId('offline-status')).toHaveAttribute('data-state', 'ready', { timeout: 30000 });
     await expect(page.locator('#enc-file')).toHaveAttribute('multiple', '');
-    const oldName = await page.evaluate(async () => (await caches.keys()).find(name => name.startsWith('veli-offline-')));
-    const version = oldName.slice('veli-offline-'.length);
+    const oldName = await page.evaluate(async () => (await caches.keys()).find(name => name.startsWith('veli-precache-')));
+    const version = oldName.slice('veli-precache-'.length);
     worker = originalWorker.replace(JSON.stringify(version), JSON.stringify(version + '-update'));
     expect(worker).not.toBe(originalWorker);
     server.setFile('/service-worker.js', worker);
@@ -59,7 +59,10 @@ test('an update waits for an active download and the installed app reopens offli
     const reopened = await context.newPage();
     await reopened.goto('/generate-keys/');
     await expect(reopened.getByTestId('offline-status')).toHaveAttribute('data-state', 'ready', { timeout: 30000 });
-    await expect.poll(() => reopened.evaluate(async () => (await caches.keys()).filter(name => name.startsWith('veli-offline-')))).toEqual([oldName + '-update']);
+    await expect.poll(() => reopened.evaluate(async name => {
+      const cache = await caches.open(name);
+      return (await (await cache.match('/.veli-precache-index'))?.json())?.['/index.html'];
+    }, oldName + '-update')).toBe(oldName);
     await reopened.locator('.keyPairGenerateBtn').click();
     await expect(reopened.locator('#generatedPublicKey')).not.toHaveValue('');
   } finally {

@@ -1,6 +1,7 @@
 /// <reference lib="webworker" />
 
-const prefix = "veli-offline-";
+import { offlineCache } from "./offline-cache.ts";
+
 const pages: Record<string, string> = {
   "/": "/index.html",
   "/headless": "/headless/index.html",
@@ -21,17 +22,11 @@ function withoutRedirectHistory(response: Response): Response {
 export function installOffline(scope: ServiceWorkerGlobalScope, precache: Record<string, string>, version: string): void {
   const paths = Object.keys(precache);
   if (!paths.length) return;
-  const cacheName = prefix + version;
   const allowed = new Set(paths);
-  const request = (path: string) =>
-    new Request(new URL(path, scope.location.origin), { cache: "reload", integrity: precache[path] });
-  const missingPaths = async (cache: Cache) => {
-    const keys = new Set((await cache.keys()).map(request => new URL(request.url).pathname));
-    return paths.filter(path => !keys.has(path));
-  };
+  const storage = offlineCache(scope, precache, version);
   const readCached = async (path: string) => {
     try {
-      return await (await caches.open(cacheName)).match(path);
+      return await storage.match(await storage.open(), path);
     } catch {
       // An unreadable cache is a miss. The network may still be available.
       return undefined;
@@ -43,23 +38,10 @@ export function installOffline(scope: ServiceWorkerGlobalScope, precache: Record
     // The first worker can serve streaming downloads before its offline cache is ready.
     // An update must prepare its cache before it can replace the active worker.
     if (!scope.registration.active) return;
-    event.waitUntil((async () => {
-      const cache = await caches.open(cacheName);
-      try {
-        // Require every response to match this build, even during a deployment.
-        await cache.addAll(paths.map(request));
-      } catch (error) {
-        await caches.delete(cacheName);
-        throw error;
-      }
-    })());
+    event.waitUntil(storage.prepare());
   });
   scope.addEventListener("activate", event => {
-    event.waitUntil((async () => {
-      for (const key of await caches.keys()) {
-        if (key.startsWith(prefix) && key !== cacheName) await caches.delete(key);
-      }
-    })().catch(() => {
+    event.waitUntil(storage.cleanUp().catch(() => {
       // Cache Storage errors must not prevent the worker from taking control.
     }));
   });
@@ -69,16 +51,15 @@ export function installOffline(scope: ServiceWorkerGlobalScope, precache: Record
     event.waitUntil((async () => {
       let ready = false;
       try {
-        const cache = await caches.open(cacheName);
-        const missing = await missingPaths(cache);
+        const missing = await storage.missingPaths(await storage.open());
         ready = missing.length === 0;
         if (!ready && event.data.repair === true) {
           port.postMessage({ repairing: true });
           // Initial preparation and repair both require this worker's build.
-          repair ??= cache.addAll(missing.map(request))
+          repair ??= storage.repair()
             .finally(() => { repair = undefined; });
           await repair;
-          ready = (await missingPaths(await caches.open(cacheName))).length === 0;
+          ready = (await storage.missingPaths(await storage.open())).length === 0;
         }
       } catch {
         // Keep surviving entries and let the next online visit retry.
@@ -101,9 +82,9 @@ export function installOffline(scope: ServiceWorkerGlobalScope, precache: Record
       event.respondWith((async () => {
         let cached: Response | undefined;
         try {
-          const cache = await caches.open(cacheName);
-          cached = await cache.match(key);
-          if (cached && (await missingPaths(cache)).length === 0) return withoutRedirectHistory(cached);
+          const build = await storage.open();
+          cached = await storage.match(build, key);
+          if (cached && (await storage.missingPaths(build)).length === 0) return withoutRedirectHistory(cached);
         } catch {
           // An unreadable cache may still have a usable page if the network fails.
         }
