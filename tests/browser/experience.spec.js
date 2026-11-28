@@ -1,9 +1,10 @@
 const { test, expect } = require("@playwright/test");
+const { selectFile } = require("../helpers/browserFiles");
 const sample = { name: "계약서-한글-and-a-very-long-filename-for-mobile-layout.txt", mimeType: "text/plain", buffer: Buffer.from("UX file fixture") };
 
 async function choose(page) {
   await page.goto("/");
-  await page.locator("#enc-file").setInputFiles(sample);
+  await selectFile(page.locator("#simple-tabpanel-0"), sample);
   await page.getByRole("button", { name: "Set a password", exact: true }).click();
 }
 
@@ -88,7 +89,7 @@ test("going back keeps input, validates short passwords, and exposes one keyboar
 test("public-key invitation preserves base64 symbols", async ({ page }) => {
   const publicKey = "+/v7+/v7+/v7+/v7+/v7+/v7+/v7+/v7+/v7+/v7+/s=";
   await page.goto("/?tab=encryption&publicKey=" + encodeURIComponent(publicKey));
-  await page.locator("#enc-file").setInputFiles(sample);
+  await selectFile(page.locator("#simple-tabpanel-0"), sample);
   await page.getByRole("button", { name: "Set a password", exact: true }).click();
   await expect(page.getByLabel(/^Recipient's Public Key\s*\*?$/)).toHaveValue(publicKey);
   await expect(page.getByRole("button", { name: "Use a password instead", exact: true })).toBeVisible();
@@ -154,7 +155,7 @@ test("stalled streaming can be cancelled without allowing tab or language change
   });
   await page.goto("/");
   await expect(page.locator("#enc-file")).toHaveAttribute("multiple", "");
-  await page.locator("#enc-file").setInputFiles(sample);
+  await selectFile(page.locator("#simple-tabpanel-0"), sample);
   await page.getByRole("button", { name: "Set a password", exact: true }).click();
   await page.getByLabel(/^Password\s*\*?$/).fill("Sample-password-123!");
   await page.getByRole("button", { name: "Review encryption", exact: true }).click();
@@ -176,7 +177,7 @@ test("Korean password flow downloads the original plaintext after decryption", a
   await page.addInitScript(() => localStorage.setItem("language", "ko_KR"));
   await page.goto("/");
   const encryptPanel = page.locator("#simple-tabpanel-0");
-  await page.locator("#enc-file").setInputFiles(sample);
+  await selectFile(encryptPanel, sample);
   await encryptPanel.getByRole("button", { name: "비밀번호 설정하기", exact: true }).click();
   await encryptPanel.locator("#encrypt-password").fill("Korean-flow-password-123!");
   await encryptPanel.getByRole("button", { name: "암호화 준비하기", exact: true }).click();
@@ -190,7 +191,7 @@ test("Korean password flow downloads the original plaintext after decryption", a
   await expect(encryptPanel.getByRole("heading", { name: "파일을 암호화했어요", exact: true })).toBeVisible();
   await page.getByRole("tab", { name: "파일 복호화", exact: true }).click();
   const decryptPanel = page.locator("#simple-tabpanel-1");
-  await page.locator("#dec-file").setInputFiles({ ...sample, name: sample.name + ".enc", buffer: encrypted });
+  await selectFile(decryptPanel, { ...sample, name: sample.name + ".enc", buffer: encrypted });
   await decryptPanel.getByRole("button", { name: "파일 확인하기", exact: true }).click();
   await decryptPanel.locator("#decrypt-password").fill("Korean-flow-password-123!");
   await decryptPanel.getByRole("button", { name: /^(비밀번호 확인하기|파일 복호화하기)$/ }).click();
@@ -215,7 +216,7 @@ for (const locale of [
     page.on("pageerror", error => errors.push(error.message));
     await page.addInitScript(code => localStorage.setItem("language", code), locale.code);
     await page.goto("/");
-    await page.locator("#enc-file").setInputFiles(sample);
+    await selectFile(page.locator("#simple-tabpanel-0"), sample);
     await page.getByRole("button", { name: locale.code === "ko_KR" ? "비밀번호 설정하기" : "Set a password", exact: true }).click();
     const input = page.locator("#encrypt-password");
     for (const password of ["password", "qwertyuiop"]) {

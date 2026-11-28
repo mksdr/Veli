@@ -1,4 +1,5 @@
 const { test, expect } = require("@playwright/test");
+const { selectFile } = require("../helpers/browserFiles");
 
 const copy = {
   en_US: {
@@ -32,8 +33,8 @@ for (const path of ["/", "/headless/"]) {
     test(`password strength groups guessable scores at ${path} in ${language}`, async ({ page }) => {
       await page.addInitScript(language => localStorage.setItem("language", language), language);
       await page.goto(path);
-      await page.locator("#enc-file").setInputFiles({ name: "strength.txt", mimeType: "text/plain", buffer: Buffer.from("Password strength fixture") });
       const panel = page.locator("#simple-tabpanel-0");
+      await selectFile(panel, { name: "strength.txt", mimeType: "text/plain", buffer: Buffer.from("Password strength fixture") });
       await panel.getByRole("button", { name: text.continue, exact: true }).click();
       const input = panel.locator("#encrypt-password");
       const strength = panel.getByText(new RegExp(`^${text.strength}:`));

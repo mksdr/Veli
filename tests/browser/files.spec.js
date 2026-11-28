@@ -4,7 +4,7 @@ const sodium = require("libsodium-wrappers-sumo");
 const { encryptLegacy, decryptLegacy } = require("../helpers/legacyCrypto");
 const plaintext = Buffer.from("Veli browser round trip: 한글 🔐\n");
 
-const { contents, encrypt, decrypt, password } = require("../helpers/browserFiles");
+const { selectFile, contents, encrypt, decrypt, password } = require("../helpers/browserFiles");
 
 for (const path of ["/", "/headless/"]) {
   test("password file round trip at " + path, async ({ page }) => {
@@ -50,8 +50,8 @@ test("cancelling a real page exit keeps streaming encryption alive", async ({ pa
   });
   await page.goto("/");
   await expect(page.locator("#enc-file")).toHaveAttribute("multiple", "");
-  await page.locator("#enc-file").setInputFiles({ name: "exit-test.txt", mimeType: "text/plain", buffer: plaintext });
   const panel = page.locator("#simple-tabpanel-0");
+  await selectFile(panel, { name: "exit-test.txt", mimeType: "text/plain", buffer: plaintext });
   await panel.getByRole("button", { name: "Set a password", exact: true }).click();
   await panel.locator('input[type="password"]').fill(password);
   await panel.getByRole("button", { name: "Review encryption", exact: true }).click();
@@ -117,10 +117,10 @@ for (const mode of ["password", "public-key"]) {
 
 test("malformed short encrypted file releases busy state", async ({ page }) => {
   await page.goto("/?tab=decryption");
-  await page.locator("#dec-file").setInputFiles({
+  const panel = page.locator("#simple-tabpanel-1");
+  await selectFile(panel, {
     name: "short.enc", mimeType: "application/octet-stream", buffer: Buffer.from("zDKO6XYXioc"),
   });
-  const panel = page.locator("#simple-tabpanel-1");
   await panel.getByRole("button", { name: "Check file", exact: true }).click();
   await panel.locator('input[type="password"]').fill(password);
   await panel.getByRole("button", { name: /^(Check password|Decrypt file)$/ }).click();
@@ -163,7 +163,10 @@ for (const mode of ["buffered", "streaming"]) {
 test("large file metadata does not read the entire file for hashing", async ({ page }) => {
   await page.goto("/");
   // File contents are synthesized in the browser to avoid an enormous fixture.
-  await page.locator("#enc-file").evaluate(input => {
+  const panel = page.locator("#simple-tabpanel-0");
+  await expect(panel.locator("#enc-file")).toBeAttached();
+  await panel.evaluate(root => {
+    const input = root.querySelector("#enc-file");
     const transfer = new DataTransfer();
     transfer.items.add(new File([new Uint8Array(33 * 1024 * 1024)], "large.bin"));
     input.files = transfer.files;

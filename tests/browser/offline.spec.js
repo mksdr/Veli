@@ -4,7 +4,7 @@ const os = require('node:os');
 const path = require('node:path');
 const sodium = require('libsodium-wrappers-sumo');
 const { staticServer } = require('../helpers/staticServer');
-const { contents, encrypt, decrypt, password, plaintext } = require('../helpers/browserFiles');
+const { selectFile, contents, encrypt, decrypt, password, plaintext } = require('../helpers/browserFiles');
 
 // Firefox automation's ephemeral profiles bypass worker control on navigation.
 const test = base.extend({
@@ -170,6 +170,47 @@ for (const controlled of [false, true]) {
   });
 }
 
+test('file selection and worker readiness in the same turn preserve the buffered draft', async ({ page, browserName }) => {
+  test.skip(browserName === 'webkit', 'Exercise the desktop streaming eligibility path');
+  await page.clock.install();
+  await page.addInitScript(() => {
+    const onmessage = Object.getOwnPropertyDescriptor(MessagePort.prototype, 'onmessage');
+    Object.defineProperty(MessagePort.prototype, 'onmessage', {
+      ...onmessage,
+      set(listener) {
+        if (!listener) return onmessage.set.call(this, listener);
+        onmessage.set.call(this, function (event) {
+          listener.call(this, event);
+          if (event.data?.version === 1) window.selectFileDuringProtocol?.();
+        });
+      },
+    });
+  });
+  await openWithWorkerState(page, { slot: 'active', state: 'activated', controlled: true });
+  await page.waitForFunction(() => window.workerFixture.protocolRequests.length === 1);
+  await page.clock.fastForward(2100);
+  const fileInput = page.locator('#enc-file');
+  await expect(fileInput).toHaveJSProperty('multiple', false);
+
+  const name = 'selected-during-worker-reply.txt';
+  await page.evaluate(fileName => {
+    window.selectFileDuringProtocol = () => {
+      const input = document.getElementById('enc-file');
+      const transfer = new DataTransfer();
+      transfer.items.add(new File(['draft'], fileName));
+      input.files = transfer.files;
+      input.dispatchEvent(new Event('change', { bubbles: true }));
+    };
+    window.workerFixture.protocolRequests[0].postMessage({ version: 1 });
+  }, name);
+
+  await expect(page.getByText(name, { exact: true })).toBeVisible();
+  await expect(fileInput).toHaveJSProperty('multiple', false);
+  await expect(page.getByRole('button', { name: 'Set a password', exact: true })).toBeEnabled();
+  await page.getByRole('button', { name: `Remove file: ${name}`, exact: true }).click();
+  await expect(fileInput).toHaveJSProperty('multiple', true);
+});
+
 test('a first claim can arrive before the client sees the worker state change', async ({ page, browserName }) => {
   test.skip(browserName === 'webkit', 'Exercise the desktop streaming eligibility path');
   await openWithWorkerState(page, { slot: 'active', state: 'installing', controlled: true });
@@ -266,7 +307,7 @@ test('a late protocol reply preserves a headless buffered draft and enables stre
   await page.clock.fastForward(2100);
   await expect(page.locator('#enc-file')).toHaveJSProperty('multiple', false);
   await expect(page.getByRole('button', { name: 'Browse File', exact: true })).toBeEnabled();
-  await page.locator('#enc-file').setInputFiles(file);
+  await selectFile(page.locator('#simple-tabpanel-0'), file);
   await page.getByRole('button', { name: 'Set a password', exact: true }).click();
   await page.getByLabel(/^Password\s*\*?$/).fill(password);
   await page.evaluate(() => window.resumeProtocol());
@@ -468,7 +509,7 @@ for (const route of ['/', '/headless/']) {
 test('offline password generation, Korean, and dark mode survive reload', async ({ page, context, offlineServer }) => {
   await prepare(page);
   await disconnect(context, offlineServer);
-  await page.locator('#enc-file').setInputFiles({ name: 'sample.txt', mimeType: 'text/plain', buffer: plaintext });
+  await selectFile(page.locator('#simple-tabpanel-0'), { name: 'sample.txt', mimeType: 'text/plain', buffer: plaintext });
   await page.getByRole('button', { name: 'Set a password', exact: true }).click();
   await page.getByRole('combobox', { name: 'Generate Password', exact: true }).click();
   await page.getByRole('option', { name: 'Memorable words', exact: true }).click();

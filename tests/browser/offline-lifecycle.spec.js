@@ -3,7 +3,7 @@ const { staticServer } = require('../helpers/staticServer');
 const fs = require('node:fs/promises');
 const os = require('node:os');
 const path = require('node:path');
-const { contents, plaintext, password } = require('../helpers/browserFiles');
+const { selectFile, contents, plaintext, password } = require('../helpers/browserFiles');
 const { decryptLegacy } = require('../helpers/legacyCrypto');
 
 test('an update waits for an active download and the installed app reopens offline', async ({ browserName, playwright }) => {
@@ -36,7 +36,7 @@ test('an update waits for an active download and the installed app reopens offli
     worker = originalWorker.replace(JSON.stringify(version), JSON.stringify(version + '-update'));
     expect(worker).not.toBe(originalWorker);
     server.setFile('/service-worker.js', worker);
-    await page.locator('#enc-file').setInputFiles({ name: 'updating.txt', mimeType: 'text/plain', buffer: plaintext });
+    await selectFile(page.locator('#simple-tabpanel-0'), { name: 'updating.txt', mimeType: 'text/plain', buffer: plaintext });
     await page.getByRole('button', { name: 'Set a password', exact: true }).click();
     await page.locator('#encrypt-password').fill(password);
     await page.getByRole('button', { name: 'Review encryption', exact: true }).click();

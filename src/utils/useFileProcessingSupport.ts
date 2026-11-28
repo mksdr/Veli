@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useLayoutEffect, useState } from "react";
 import { useWorkflow } from "../components/WorkflowContext";
 import { registerAppWorker } from "./appWorker";
 import { waitForWorkerControl, watchWorkerProtocol } from "./workerSupport";
@@ -7,7 +7,7 @@ export default function useFileProcessingSupport(): boolean | null {
   const [streaming, setStreaming] = useState<boolean | null>(null);
   const streamingEnabled = streaming === true;
   const [verifiedWorker, setVerifiedWorker] = useState<ServiceWorker | null>(null);
-  const { busy, dirty } = useWorkflow();
+  const { busy, dirty, isIdle } = useWorkflow();
   useEffect(() => {
     if (streamingEnabled) return;
     const safari = /Safari/.test(navigator.userAgent) && /Apple/.test(navigator.vendor);
@@ -66,11 +66,13 @@ export default function useFileProcessingSupport(): boolean | null {
     };
   }, [streamingEnabled]);
 
-  useEffect(() => {
-    if (streaming !== false || busy || dirty || !verifiedWorker || navigator.serviceWorker.controller !== verifiedWorker) return;
+  useLayoutEffect(() => {
+    if (streaming !== false || busy || dirty || !verifiedWorker || navigator.serviceWorker.controller !== verifiedWorker || !isIdle()) return;
+    // A child may have reported activity in this commit, before the context
+    // snapshot reflects it. Finish an idle transition before the next input.
     // eslint-disable-next-line react-hooks/set-state-in-effect -- Latch the verified mode before a new file workflow begins.
     setStreaming(true);
-  }, [streaming, busy, dirty, verifiedWorker]);
+  }, [streaming, busy, dirty, verifiedWorker, isIdle]);
 
   return streaming;
 }
