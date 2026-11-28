@@ -128,24 +128,37 @@ test("malformed short encrypted file releases busy state", async ({ page }) => {
   await expect(panel.getByRole("button", { name: /^(Check password|Decrypt file)$/ }).last()).toBeEnabled();
 });
 
-test("does not accept an authenticated non-final chunk as a complete file", async ({ page }) => {
-  await sodium.ready;
-  const salt = sodium.randombytes_buf(16);
-  const key = sodium.crypto_pwhash(32, password, salt,
-    sodium.crypto_pwhash_OPSLIMIT_INTERACTIVE, sodium.crypto_pwhash_MEMLIMIT_INTERACTIVE, sodium.crypto_pwhash_ALG_ARGON2ID13);
-  const { state, header } = sodium.crypto_secretstream_xchacha20poly1305_init_push(key);
-  const chunk = sodium.crypto_secretstream_xchacha20poly1305_push(state, plaintext, null, 0);
-  const encrypted = Buffer.concat([Buffer.from("zDKO6XYXioc"), Buffer.from(salt), Buffer.from(header), Buffer.from(chunk)]);
-  const panel = await decrypt(page, encrypted);
-  const streamButton = panel.getByRole("button", { name: "Decrypt & download", exact: true });
-  await Promise.race([
-    streamButton.waitFor({ state: "visible" }),
-    panel.getByRole("alert").filter({ hasText: "File processing failed" }).waitFor({ state: "visible" }),
-  ]);
-  if (await streamButton.isVisible()) await streamButton.click();
-  await expect(panel.getByRole("alert").filter({ hasText: "File processing failed" })).toBeVisible();
-  await expect(panel.getByRole("button", { name: "Download decrypted file", exact: true })).toBeHidden();
-});
+for (const mode of ["buffered", "streaming"]) {
+  test.describe(mode + " decryption", () => {
+    if (mode === "buffered") test.use({ serviceWorkers: "block" });
+    else test.skip(({ browserName }) => browserName !== "chromium", "Exercise streaming in a controlled Chromium page");
+
+    test("does not accept an authenticated non-final chunk as a complete file", async ({ page }) => {
+      await sodium.ready;
+      const salt = sodium.randombytes_buf(16);
+      const key = sodium.crypto_pwhash(32, password, salt,
+        sodium.crypto_pwhash_OPSLIMIT_INTERACTIVE, sodium.crypto_pwhash_MEMLIMIT_INTERACTIVE, sodium.crypto_pwhash_ALG_ARGON2ID13);
+      const { state, header } = sodium.crypto_secretstream_xchacha20poly1305_init_push(key);
+      const chunk = sodium.crypto_secretstream_xchacha20poly1305_push(state, plaintext, null, sodium.crypto_secretstream_xchacha20poly1305_TAG_MESSAGE);
+      const encrypted = Buffer.concat([Buffer.from("zDKO6XYXioc"), Buffer.from(salt), Buffer.from(header), Buffer.from(chunk)]);
+
+      await page.goto("/");
+      if (mode === "streaming") {
+        // The first worker can replace the buffered file input as it takes control.
+        await expect(page.locator("#dec-file")).toHaveAttribute("multiple", "");
+      }
+      const panel = await decrypt(page, encrypted, "/", undefined, false);
+      if (mode === "streaming") {
+        const streamButton = panel.getByRole("button", { name: "Decrypt & download", exact: true });
+        await expect(streamButton).toBeEnabled();
+        await streamButton.click();
+      }
+      await expect(panel.getByRole("alert").filter({ hasText: "File processing failed" })).toBeVisible();
+      await expect(panel.getByRole("heading", { name: "Your files are decrypted and verified", exact: true })).toBeHidden();
+      await expect(panel.getByRole("button", { name: "Download decrypted file", exact: true })).toBeHidden();
+    });
+  });
+}
 
 test("large file metadata does not read the entire file for hashing", async ({ page }) => {
   await page.goto("/");
