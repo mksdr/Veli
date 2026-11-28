@@ -13,6 +13,51 @@ async function hasIntegrity(response: Response, integrity: string): Promise<bool
   return integrity === "sha256-" + btoa(String.fromCharCode(...new Uint8Array(digest)));
 }
 
+function workerCacheName(worker: ServiceWorker): Promise<string | undefined> {
+  return new Promise(resolve => {
+    const { port1, port2 } = new MessageChannel();
+    const finish = (name?: string) => {
+      clearTimeout(timeout);
+      port1.close();
+      port2.close();
+      resolve(name);
+    };
+    // A worker from an earlier release may not understand this request.
+    const timeout = setTimeout(finish, 500);
+    port1.onmessage = ({ data }) => finish(
+      typeof data === "string" && data.startsWith(buildPrefix) ? data : undefined,
+    );
+    try {
+      worker.postMessage({ cmd: "getOfflineCacheName" }, [port2]);
+    } catch {
+      finish();
+    }
+  });
+}
+
+async function pruneCaches(builds: Map<string, AssetLinks>) {
+  const retained = new Map<string, Set<string>>();
+  for (const links of builds.values()) {
+    for (const [path, source] of Object.entries(links)) {
+      const paths = retained.get(source) ?? new Set<string>();
+      paths.add(path);
+      retained.set(source, paths);
+    }
+  }
+  for (const name of await caches.keys()) {
+    if (builds.has(name) || !(name.startsWith(buildPrefix) || name.startsWith(legacyPrefix))) continue;
+    const paths = retained.get(name);
+    if (!paths) {
+      await caches.delete(name);
+      continue;
+    }
+    const cache = await caches.open(name);
+    for (const key of await cache.keys()) {
+      if (!paths.has(new URL(key.url).pathname)) await cache.delete(key);
+    }
+  }
+}
+
 export function offlineCache(scope: ServiceWorkerGlobalScope, precache: Record<string, string>, version: string) {
   const paths = Object.keys(precache);
   const cacheName = buildPrefix + version;
@@ -43,8 +88,32 @@ export function offlineCache(scope: ServiceWorkerGlobalScope, precache: Record<s
     return paths.filter(path => !local.has(path) && !linked.get(links[path])?.has(path));
   }
 
+  async function pruneBeforeInstall() {
+    const { active, waiting } = scope.registration;
+    if (active?.state !== "activated") return;
+    const [activeName, waitingName] = await Promise.all([
+      workerCacheName(active),
+      waiting && workerCacheName(waiting),
+    ]);
+    if (!activeName || (waiting && !waitingName) ||
+        active !== scope.registration.active || waiting !== scope.registration.waiting) return;
+
+    // Install events for this registration run in sequence. A waiting worker can
+    // still activate during cleanup, so keep its build as well as the active one.
+    const builds = new Map<string, AssetLinks>();
+    for (const name of new Set([activeName, waitingName])) {
+      if (!name) continue;
+      const index = await caches.match(indexPath, { cacheName: name });
+      builds.set(name, index ? await index.json() as AssetLinks : {});
+    }
+    await pruneCaches(builds);
+  }
+
   function prepare() {
     return withLock(async () => {
+      if (!locks) await pruneBeforeInstall().catch(() => {
+        // Cleanup is best effort. Installation still verifies its own files.
+      });
       // A waiting legacy worker may still activate and remove legacy caches.
       const canReuseLegacy = !scope.registration.waiting && scope.registration.active?.state !== "activating";
       const names = await caches.keys();
@@ -87,26 +156,14 @@ export function offlineCache(scope: ServiceWorkerGlobalScope, precache: Record<s
   }
 
   function cleanUp() {
-    // A worker without Web Locks can reuse assets but cannot safely prune them
-    // while a newer worker may be preparing references to those assets.
+    // Without Web Locks, cleanup runs in the next install before it reads any assets.
     if (!locks) return Promise.resolve();
     return withLock(async () => {
       const latest = await caches.match(indexPath, { cacheName: coordinationName });
       if (!latest || await latest.text() !== cacheName) return;
       const build = await open();
       if ((await missingPaths(build)).length) return;
-      for (const name of await caches.keys()) {
-        if (name === cacheName || !(name.startsWith(buildPrefix) || name.startsWith(legacyPrefix))) continue;
-        const keep = new Set(paths.filter(path => build.links[path] === name));
-        if (!keep.size) {
-          await caches.delete(name);
-          continue;
-        }
-        const cache = await caches.open(name);
-        for (const key of await cache.keys()) {
-          if (!keep.has(new URL(key.url).pathname)) await cache.delete(key);
-        }
-      }
+      await pruneCaches(new Map([[cacheName, build.links]]));
     });
   }
 
@@ -118,5 +175,5 @@ export function offlineCache(scope: ServiceWorkerGlobalScope, precache: Record<s
     });
   }
 
-  return { open, match, missingPaths, prepare, cleanUp, repair };
+  return { cacheName, open, match, missingPaths, prepare, cleanUp, repair };
 }

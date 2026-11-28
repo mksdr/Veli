@@ -25,7 +25,7 @@ test('the offline build rejects an invalid About bundle list', async t => {
   }
 });
 
-function harness({ active = null, version = 'new', integrity = precache } = {}) {
+function harness({ active = null, waiting = null, version = 'new', integrity = precache, webLocks = true } = {}) {
   const handlers = {};
   const stores = new Map();
   const deleted = [];
@@ -43,9 +43,9 @@ function harness({ active = null, version = 'new', integrity = precache } = {}) 
     return copy;
   }
   const scope = {
-    registration: { active },
+    registration: { active, waiting },
     location: { origin },
-    navigator: { locks: { request: (_, task) => task() } },
+    navigator: webLocks ? { locks: { request: (_, task) => task() } } : {},
     addEventListener(type, handler) { handlers[type] = handler; },
   };
   global.caches = {
@@ -156,6 +156,50 @@ test('activation leaves references alone when a newer build is already prepared'
   h.stores.set('veli-precache', new Map([['/.veli-precache-index', new Response('veli-precache-next')]]));
   await h.event('activate');
   assert.deepEqual(h.deleted, []);
+});
+
+test('without Web Locks, a failed install prunes only assets unused by both active and waiting builds', async () => {
+  const worker = (name, state) => ({
+    state,
+    postMessage({ cmd }, [port]) {
+      assert.equal(cmd, 'getOfflineCacheName');
+      port.postMessage(name);
+    },
+  });
+  const h = harness({
+    webLocks: false,
+    active: worker('veli-precache-active', 'activated'),
+    waiting: worker('veli-precache-waiting', 'installed'),
+  });
+  const index = '/.veli-precache-index';
+  const source = 'veli-precache-shared';
+  h.stores.set('veli-precache-active', new Map([[index, Response.json({ '/headless/index.html': source })]]));
+  h.stores.set('veli-precache-waiting', new Map([[index, Response.json({ '/offline.html': source })]]));
+  const shared = new Map([
+    ['/headless/index.html', new Response('active asset')],
+    ['/offline.html', new Response('waiting asset')],
+    ['/unused.js', new Response('obsolete asset')],
+  ]);
+  h.stores.set(source, shared);
+  h.stores.set('veli-precache-obsolete', new Map());
+  h.stores.set('another-app', new Map());
+  h.setWriteFailure(new DOMException('Storage full', 'QuotaExceededError'));
+
+  await assert.rejects(h.event('install'), { name: 'QuotaExceededError' });
+  assert.deepEqual([...h.stores.keys()], ['veli-precache-active', 'veli-precache-waiting', source, 'another-app']);
+  assert.deepEqual([...shared.keys()], ['/headless/index.html', '/offline.html']);
+});
+
+test('without Web Locks, cleanup is deferred when a worker cannot identify its build', async () => {
+  const h = harness({
+    webLocks: false,
+    active: { state: 'activated', postMessage(_, [port]) { port.postMessage('veli-precache-active'); } },
+    waiting: { state: 'installed', postMessage() { throw new Error('Worker unavailable'); } },
+  });
+  h.stores.set('veli-offline-unknown', new Map());
+  await h.event('install');
+  assert.deepEqual(h.deleted, []);
+  assert.equal(h.stores.has('veli-offline-unknown'), true);
 });
 
 for (const operation of ['keys', 'delete']) {

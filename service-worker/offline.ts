@@ -47,7 +47,12 @@ export function installOffline(scope: ServiceWorkerGlobalScope, precache: Record
   });
   scope.addEventListener("message", event => {
     const port = event.ports[0];
-    if (event.data?.cmd !== "getOfflineStatus" || !port) return;
+    if (!port) return;
+    if (event.data?.cmd === "getOfflineCacheName") {
+      port.postMessage(storage.cacheName);
+      return;
+    }
+    if (event.data?.cmd !== "getOfflineStatus") return;
     event.waitUntil((async () => {
       let ready = false;
       try {

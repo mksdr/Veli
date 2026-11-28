@@ -32,6 +32,23 @@ function legacyWorker(version, precache) {
   `;
 }
 
+function offlineWorker(version, precache, { withoutLocks = false } = {}) {
+  const { outputFiles } = buildSync({
+    stdin: {
+      contents: `
+        import { installOffline } from './service-worker/offline.ts';
+        if (${withoutLocks}) Object.defineProperty(navigator, 'locks', { value: undefined });
+        installOffline(self, ${JSON.stringify(precache)}, ${JSON.stringify(version)});
+      `,
+      resolveDir: process.cwd(),
+    },
+    target: 'es2020',
+    bundle: true,
+    write: false,
+  });
+  return outputFiles[0].contents;
+}
+
 function update(page) {
   return page.evaluate(async () => {
     const registration = await navigator.serviceWorker.getRegistration();
@@ -90,19 +107,7 @@ test('an update fits under quota by retaining the unchanged part of the legacy o
     await stale.goto(server.baseURL);
     await expect(stale).toHaveTitle('old');
 
-    const { outputFiles } = buildSync({
-      stdin: {
-        contents: `
-          import { installOffline } from './service-worker/offline.ts';
-          installOffline(self, ${JSON.stringify(manifest('new'))}, 'new');
-        `,
-        resolveDir: process.cwd(),
-      },
-      target: 'es2020',
-      bundle: true,
-      write: false,
-    });
-    server.setFile('/service-worker.js', outputFiles[0].contents);
+    server.setFile('/service-worker.js', offlineWorker('new', manifest('new')));
     server.setFile(sharedPath, null);
     expect(await update(stale)).toBe('installed');
     await stale.reload();
@@ -117,6 +122,81 @@ test('an update fits under quota by retaining the unchanged part of the legacy o
     await reopened.goto(server.baseURL);
     await expect(reopened).toHaveTitle('new');
     expect(await reopened.evaluate(() => window.sharedAssetLoaded)).toBe(true);
+  } finally {
+    await server.close();
+  }
+});
+
+test('updates without Web Locks prune obsolete caches and preserve active and waiting builds', async ({ page, context }) => {
+  const server = await staticServer();
+  const shared = 'window.sharedAssetLoaded = true;';
+  const index = '/index.html';
+  function deploy(version, { broken = false } = {}) {
+    const html = `<!doctype html><title>${version}</title><script src="${sharedPath}"></script>`;
+    const manifest = Object.fromEntries([[index, html], [sharedPath, shared]]
+      .map(([path, body]) => [path, 'sha256-' + createHash('sha256').update(body).digest('base64')]));
+    server.setFile(index, broken ? 'Mismatched deployment' : html);
+    server.setFile('/service-worker.js', offlineWorker(version, manifest, { withoutLocks: true }));
+  }
+  const cacheKeys = () => page.evaluate(() => caches.keys());
+  try {
+    server.setFile('/probe.html', 'worker probe');
+    server.setFile(sharedPath, shared);
+    deploy('first');
+    const probe = await context.newPage();
+    await probe.goto(server.baseURL + '/probe.html');
+    await page.goto(server.baseURL);
+    await page.evaluate(async () => {
+      await navigator.serviceWorker.register('/service-worker.js');
+      await navigator.serviceWorker.ready;
+    });
+    await page.reload();
+    expect(await page.evaluate(() => new Promise(resolve => {
+      const channel = new MessageChannel();
+      channel.port1.onmessage = ({ data }) => {
+        if (data.repairing) return;
+        channel.port1.close();
+        resolve(data.ready);
+      };
+      navigator.serviceWorker.controller.postMessage({ cmd: 'getOfflineStatus', repair: true }, [channel.port2]);
+    }))).toBe(true);
+    await page.evaluate(() => caches.open('another-app').then(cache => cache.put('/unrelated', new Response('keep'))));
+    server.setFile(sharedPath, null);
+
+    for (const version of ['discarded', 'waiting']) {
+      deploy(version);
+      expect(await update(page)).toBe('installed');
+    }
+    expect(await cacheKeys()).toContain('veli-precache-discarded');
+
+    deploy('broken', { broken: true });
+    expect(await update(page)).toBe('redundant');
+    expect((await cacheKeys()).sort()).toEqual([
+      'another-app', 'veli-precache', 'veli-precache-first', 'veli-precache-waiting',
+    ]);
+    await page.reload();
+    await expect(page).toHaveTitle('first');
+    expect(await page.evaluate(() => window.sharedAssetLoaded)).toBe(true);
+
+    await probe.evaluate(async () => {
+      window.waitingWorker = (await navigator.serviceWorker.getRegistration()).waiting;
+    });
+    await page.close();
+    await expect.poll(() => probe.evaluate(() => window.waitingWorker?.state)).toBe('activated');
+    await context.setOffline(true);
+    const reopened = await context.newPage();
+    await reopened.goto(server.baseURL);
+    await expect(reopened).toHaveTitle('waiting');
+    expect(await reopened.evaluate(() => window.sharedAssetLoaded)).toBe(true);
+
+    await context.setOffline(false);
+    deploy('next');
+    expect(await update(reopened)).toBe('installed');
+    expect(await reopened.evaluate(async () => {
+      const older = await caches.open('veli-precache-first');
+      return (await older.keys()).map(request => new URL(request.url).pathname);
+    })).toEqual([sharedPath]);
+    expect(await reopened.evaluate(() => caches.has('another-app'))).toBe(true);
   } finally {
     await server.close();
   }
