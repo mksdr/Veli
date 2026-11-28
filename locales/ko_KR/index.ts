@@ -1,6 +1,12 @@
 import type { Translations } from "../en_US";
 
 const ko_KR: Translations = {
+  "pwa_preparing": "오프라인 사용을 준비하고 있어요…",
+  "pwa_ready": "오프라인에서 사용할 준비가 완료됐어요",
+  "pwa_unavailable": "오프라인 사용을 준비하지 못했어요. 인터넷에 연결하고 Veli를 다시 열어주세요.",
+  "pwa_home_screen_preparing": "오프라인 준비가 완료될 때까지 인터넷에 연결된 상태로 Veli를 열어두세요.",
+  "pwa_about_online": "도움말을 보려면 인터넷 연결이 필요해요.",
+
   "file_processing_error": "파일을 처리하지 못했어요. 비밀번호나 키를 확인하고 원본 파일로 다시 시도해주세요. 일부만 다운로드된 파일은 삭제해주세요.",
   "file_hash_limit": "메모리 사용을 줄이기 위해 32 MiB 이하 파일만 해시를 계산해요.",
   "file_info_error": "파일 정보를 읽지 못했어요.",
@@ -70,7 +76,6 @@ const ko_KR: Translations = {
   "offline_note": "파일은 이 브라우저에서 처리하며 서버에 업로드하지 않아요.",
   "very_weak": "매우 약해요",
   "weak": "약해요",
-  "password_strength_hint": "길이뿐 아니라 흔한 비밀번호와 패턴도 평가해요. 숫자를 덧붙여도 쉽게 추측될 수 있으니, 관련 없는 여러 단어를 조합하거나 아래에서 비밀번호를 만들어보세요.",
   "moderate": "적절해요",
   "good": "좋아요",
   "strong": "강해요",

@@ -11,7 +11,7 @@
     "lint": "eslint .",
     "typecheck": "next typegen && tsc --noEmit",
     "test": "npm run test:security && npm run test:browser",
-    "test:security": "node --test tests/security.test.js",
+    "test:security": "node --test tests/security.test.js tests/offline.test.js",
     "test:browser": "playwright test",
     "test:release": "node --test tests/release.test.cjs"
   },

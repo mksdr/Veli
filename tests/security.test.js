@@ -5,7 +5,7 @@ const { encryptLegacy, decryptLegacy, chunkSize } = require("./helpers/legacyCry
 const { pullChunk } = require("../src/utils/secretstream.ts");
 const { decryptFile } = require("../src/utils/decryptFile.ts");
 const { installWorker } = require("../service-worker/worker.ts");
-const { registerWorker, hasWorkerProtocol } = require("../src/utils/workerSupport.ts");
+const { registerWorker, waitForWorkerControl, watchWorkerProtocol } = require("../src/utils/workerSupport.ts");
 const { getStoredValue, setStoredValue } = require("../src/utils/storage.ts");
 const { formatName } = require("../src/helpers/formatName.ts");
 
@@ -271,10 +271,17 @@ test("worker registration waits for control and times out without leaking listen
 });
 
 test("falls back from an older worker that does not implement the protocol", async () => {
-  assert.equal(await hasWorkerProtocol({ serviceWorker: { controller: { postMessage() {} } } }, 5), false);
-  assert.equal(await hasWorkerProtocol({ serviceWorker: { controller: {
-    postMessage(data, ports) { ports[0].postMessage({ version: 1 }); },
-  } } }, 100), true);
+  const { promise, resolve } = Promise.withResolvers();
+  const stop = watchWorkerProtocol({ postMessage() {} }, resolve, 5);
+  try { assert.equal(await promise, false); }
+  finally { stop(); }
+
+  for (const version of [1, 2]) {
+    const supported = await new Promise(resolve => watchWorkerProtocol({
+      postMessage(data, ports) { ports[0].postMessage({ version }); },
+    }, resolve));
+    assert.equal(supported, version === 1);
+  }
 });
 
 test("download setup echoes its request token and can be cancelled before fetching", async () => {
@@ -337,4 +344,43 @@ test("worker rejects missing chunks and credentials instead of coercing undefine
   await h.send(client, { cmd: "encryptFirstChunk", last: true, operationId: enc.operationId });
   await rejected;
   assert.equal(client.messages.at(-1).reply, "operationError");
+});
+
+test("a fulfilled null registration falls back before the next event-loop turn", async () => {
+  let listeners = 0;
+  const result = await Promise.race([
+    waitForWorkerControl({ serviceWorker: {
+      controller: null,
+      addEventListener() { listeners++; },
+    } }, 1000, async () => null),
+    new Promise(resolve => setImmediate(() => resolve("still waiting"))),
+  ]);
+  assert.equal(result, false);
+  assert.equal(listeners, 0);
+});
+
+for (const [slot, state] of [["installing", "installing"], ["waiting", "installed"], ["active", "activating"]]) {
+  test(`redundancy in the ${slot} slot ends the control wait immediately`, async t => {
+    const worker = Object.assign(new EventTarget(), { state });
+    const serviceWorker = Object.assign(new EventTarget(), { controller: null });
+    const removeWorkerListener = t.mock.method(worker, "removeEventListener");
+    const removeControllerListener = t.mock.method(serviceWorker, "removeEventListener");
+    const registration = { installing: null, waiting: null, active: null, [slot]: worker };
+    const pending = waitForWorkerControl({ serviceWorker }, 1000, async () => registration);
+    await new Promise(resolve => setImmediate(resolve));
+    worker.state = "redundant";
+    worker.dispatchEvent(new Event("statechange"));
+    const result = await Promise.race([pending, new Promise(resolve => setImmediate(() => resolve("still waiting")))]);
+    assert.equal(result, false);
+    assert.equal(removeWorkerListener.mock.callCount(), 1);
+    assert.equal(removeControllerListener.mock.callCount(), 1);
+  });
+}
+
+test("a registration whose failed install was already cleared ends the control wait immediately", async () => {
+  const serviceWorker = new EventTarget();
+  const registration = { installing: null, waiting: null, active: null };
+  const pending = waitForWorkerControl({ serviceWorker }, 1000, async () => registration);
+  const result = await Promise.race([pending, new Promise(resolve => setImmediate(() => resolve("still waiting")))]);
+  assert.equal(result, false);
 });

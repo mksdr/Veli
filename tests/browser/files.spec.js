@@ -2,61 +2,9 @@ const { test, expect } = require("@playwright/test");
 const fs = require("node:fs/promises");
 const sodium = require("libsodium-wrappers-sumo");
 const { encryptLegacy, decryptLegacy } = require("../helpers/legacyCrypto");
-const password = "Browser-test-password-123!";
 const plaintext = Buffer.from("Veli browser round trip: 한글 🔐\n");
 
-async function contents(download) {
-  expect(await download.failure()).toBeNull();
-  return fs.readFile(await download.path());
-}
-
-async function encrypt(page, path = "/", keys) {
-  await page.goto(path);
-  await page.locator("#enc-file").setInputFiles({ name: "한글 document.txt", mimeType: "text/plain", buffer: plaintext });
-  const panel = page.locator("#simple-tabpanel-0");
-  await panel.getByRole("button", { name: "Set a password", exact: true }).last().click();
-  if (keys) {
-    await panel.getByRole("button", { name: "Use public keys · Advanced", exact: true }).click();
-    await panel.getByPlaceholder("Enter recipient's public key").fill(keys.publicKey);
-    await panel.getByPlaceholder("Enter your private key").fill(keys.privateKey);
-  } else {
-    await panel.locator('input[type="password"]').fill(password);
-  }
-  await panel.getByRole("button", { name: "Review encryption", exact: true }).click();
-  const download = page.waitForEvent("download");
-  await panel.getByRole("button", { name: /^(Encrypt & download|Encrypt file)$/ }).click();
-  // Buffered mode presents a separate download button after encryption.
-  const buffered = panel.getByRole("button", { name: "Download encrypted file", exact: true });
-  if (await buffered.isVisible()) await buffered.click();
-  else {
-    await Promise.race([
-      download,
-      buffered.waitFor({ state: "visible" }).then(() => buffered.click()),
-    ]);
-  }
-  return contents(await download);
-}
-
-async function decrypt(page, encrypted, path = "/", keys, navigate = true) {
-  if (navigate) await page.goto(path + "?tab=decryption");
-  else await page.getByRole("tab", { name: "Decrypt files", exact: true }).click();
-  await page.locator("#dec-file").setInputFiles({ name: "한글 document.txt.enc", mimeType: "application/octet-stream", buffer: encrypted });
-  const panel = page.locator("#simple-tabpanel-1");
-  await panel.getByRole("button", { name: "Check file", exact: true }).click();
-  if (keys) {
-    await panel.getByPlaceholder("Enter sender's public key").fill(keys.publicKey);
-    await panel.getByPlaceholder("Enter your private key").fill(keys.privateKey);
-  } else {
-    await panel.locator('input[type="password"]').fill(password);
-  }
-  await panel.getByRole("button", { name: /^(Check password|Check keys|Decrypt file)$/ }).click();
-  await Promise.race([
-    panel.getByRole("button", { name: "Decrypt & download", exact: true }).waitFor({ state: "visible" }),
-    panel.getByRole("button", { name: "Download decrypted file", exact: true }).waitFor({ state: "visible" }),
-    panel.getByRole("alert").filter({ hasText: "File processing failed" }).waitFor({ state: "visible" }),
-  ]);
-  return panel;
-}
+const { selectFile, contents, encrypt, decrypt, password } = require("../helpers/browserFiles");
 
 for (const path of ["/", "/headless/"]) {
   test("password file round trip at " + path, async ({ page }) => {
@@ -101,8 +49,9 @@ test("cancelling a real page exit keeps streaming encryption alive", async ({ pa
     };
   });
   await page.goto("/");
-  await page.locator("#enc-file").setInputFiles({ name: "exit-test.txt", mimeType: "text/plain", buffer: plaintext });
+  await expect(page.locator("#enc-file")).toHaveAttribute("multiple", "");
   const panel = page.locator("#simple-tabpanel-0");
+  await selectFile(panel, { name: "exit-test.txt", mimeType: "text/plain", buffer: plaintext });
   await panel.getByRole("button", { name: "Set a password", exact: true }).click();
   await panel.locator('input[type="password"]').fill(password);
   await panel.getByRole("button", { name: "Review encryption", exact: true }).click();
@@ -168,10 +117,10 @@ for (const mode of ["password", "public-key"]) {
 
 test("malformed short encrypted file releases busy state", async ({ page }) => {
   await page.goto("/?tab=decryption");
-  await page.locator("#dec-file").setInputFiles({
+  const panel = page.locator("#simple-tabpanel-1");
+  await selectFile(panel, {
     name: "short.enc", mimeType: "application/octet-stream", buffer: Buffer.from("zDKO6XYXioc"),
   });
-  const panel = page.locator("#simple-tabpanel-1");
   await panel.getByRole("button", { name: "Check file", exact: true }).click();
   await panel.locator('input[type="password"]').fill(password);
   await panel.getByRole("button", { name: /^(Check password|Decrypt file)$/ }).click();
@@ -179,29 +128,45 @@ test("malformed short encrypted file releases busy state", async ({ page }) => {
   await expect(panel.getByRole("button", { name: /^(Check password|Decrypt file)$/ }).last()).toBeEnabled();
 });
 
-test("does not accept an authenticated non-final chunk as a complete file", async ({ page }) => {
-  await sodium.ready;
-  const salt = sodium.randombytes_buf(16);
-  const key = sodium.crypto_pwhash(32, password, salt,
-    sodium.crypto_pwhash_OPSLIMIT_INTERACTIVE, sodium.crypto_pwhash_MEMLIMIT_INTERACTIVE, sodium.crypto_pwhash_ALG_ARGON2ID13);
-  const { state, header } = sodium.crypto_secretstream_xchacha20poly1305_init_push(key);
-  const chunk = sodium.crypto_secretstream_xchacha20poly1305_push(state, plaintext, null, 0);
-  const encrypted = Buffer.concat([Buffer.from("zDKO6XYXioc"), Buffer.from(salt), Buffer.from(header), Buffer.from(chunk)]);
-  const panel = await decrypt(page, encrypted);
-  const streamButton = panel.getByRole("button", { name: "Decrypt & download", exact: true });
-  await Promise.race([
-    streamButton.waitFor({ state: "visible" }),
-    panel.getByRole("alert").filter({ hasText: "File processing failed" }).waitFor({ state: "visible" }),
-  ]);
-  if (await streamButton.isVisible()) await streamButton.click();
-  await expect(panel.getByRole("alert").filter({ hasText: "File processing failed" })).toBeVisible();
-  await expect(panel.getByRole("button", { name: "Download decrypted file", exact: true })).toBeHidden();
-});
+for (const mode of ["buffered", "streaming"]) {
+  test.describe(mode + " decryption", () => {
+    if (mode === "buffered") test.use({ serviceWorkers: "block" });
+    else test.skip(({ browserName }) => browserName !== "chromium", "Exercise streaming in a controlled Chromium page");
+
+    test("does not accept an authenticated non-final chunk as a complete file", async ({ page }) => {
+      await sodium.ready;
+      const salt = sodium.randombytes_buf(16);
+      const key = sodium.crypto_pwhash(32, password, salt,
+        sodium.crypto_pwhash_OPSLIMIT_INTERACTIVE, sodium.crypto_pwhash_MEMLIMIT_INTERACTIVE, sodium.crypto_pwhash_ALG_ARGON2ID13);
+      const { state, header } = sodium.crypto_secretstream_xchacha20poly1305_init_push(key);
+      const chunk = sodium.crypto_secretstream_xchacha20poly1305_push(state, plaintext, null, sodium.crypto_secretstream_xchacha20poly1305_TAG_MESSAGE);
+      const encrypted = Buffer.concat([Buffer.from("zDKO6XYXioc"), Buffer.from(salt), Buffer.from(header), Buffer.from(chunk)]);
+
+      await page.goto("/");
+      if (mode === "streaming") {
+        // The first worker can replace the buffered file input as it takes control.
+        await expect(page.locator("#dec-file")).toHaveAttribute("multiple", "");
+      }
+      const panel = await decrypt(page, encrypted, "/", undefined, false);
+      if (mode === "streaming") {
+        const streamButton = panel.getByRole("button", { name: "Decrypt & download", exact: true });
+        await expect(streamButton).toBeEnabled();
+        await streamButton.click();
+      }
+      await expect(panel.getByRole("alert").filter({ hasText: "File processing failed" })).toBeVisible();
+      await expect(panel.getByRole("heading", { name: "Your files are decrypted and verified", exact: true })).toBeHidden();
+      await expect(panel.getByRole("button", { name: "Download decrypted file", exact: true })).toBeHidden();
+    });
+  });
+}
 
 test("large file metadata does not read the entire file for hashing", async ({ page }) => {
   await page.goto("/");
   // File contents are synthesized in the browser to avoid an enormous fixture.
-  await page.locator("#enc-file").evaluate(input => {
+  const panel = page.locator("#simple-tabpanel-0");
+  await expect(panel.locator("#enc-file")).toBeAttached();
+  await panel.evaluate(root => {
+    const input = root.querySelector("#enc-file");
     const transfer = new DataTransfer();
     transfer.items.add(new File([new Uint8Array(33 * 1024 * 1024)], "large.bin"));
     input.files = transfer.files;
@@ -220,7 +185,7 @@ test("Firefox streams files in a normal persistent profile", async ({ browserNam
   });
   try {
     const page = await context.newPage();
-    const encrypted = await encrypt(page);
+    const encrypted = await encrypt(page, "/", undefined, { streaming: true });
     await expect(page.getByRole("heading", { name: "Your files are encrypted", exact: true })).toBeVisible();
     // Firefox automation navigation can bypass worker control. Exercise both
     // stream directions within the same controlled page using the app's tab.

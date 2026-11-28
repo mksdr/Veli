@@ -4,9 +4,7 @@ import Hero from "../components/Hero";
 import Panels from "../components/Panels";
 import Footer from "../components/Footer";
 
-
-
-const MainContainer = () => {
+const MainContainer = ({ streaming }: { streaming: boolean | null }) => {
 
   return (
     <Box sx={{
@@ -17,7 +15,7 @@ const MainContainer = () => {
       }}>
       <NavAppBar />
       <Hero />
-      <Panels />
+      {streaming !== null && <Panels buffered={!streaming} />}
       <Footer />
     </Box>
   );

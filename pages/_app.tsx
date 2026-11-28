@@ -1,3 +1,4 @@
+import OfflineProvider from "../src/components/OfflineProvider";
 import type { AppProps } from "next/app";
 import Head from "next/head";
 import { getTranslations as t } from "../locales";
@@ -14,6 +15,8 @@ function AppContent({ Component, pageProps }: AppProps) {
         <title>
           {`Veli - ${t("sub_title")}`}
         </title>
+        <link rel="manifest" href="/manifest.webmanifest" />
+        <link rel="apple-touch-icon" href="/assets/icons/apple-touch-icon.png" />
         <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
         <link rel="icon" type="image/x-icon" href="/favicon.ico" sizes="16x16 24x24 32x32 48x48 64x64 128x128 256x256" />
 
@@ -39,7 +42,7 @@ function AppContent({ Component, pageProps }: AppProps) {
         />
       </Head>
       <AppearanceProvider>
-        <WorkflowProvider key={locale}><Component {...pageProps} /></WorkflowProvider>
+        <OfflineProvider><WorkflowProvider key={locale}><Component {...pageProps} /></WorkflowProvider></OfflineProvider>
       </AppearanceProvider>
     </>
   );

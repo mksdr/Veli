@@ -31,7 +31,7 @@ async function buildServiceWorker(options = {}) {
 
   const result = await esbuild.build({
     entryPoints: [path.join(projectRoot, "service-worker/sw.ts")],
-    outfile: path.join(projectRoot, "public/service-worker.js"),
+    outfile: options.outfile ?? path.join(projectRoot, "public/service-worker.js"),
     bundle: true,
     platform: "browser",
     format: "iife",
@@ -42,6 +42,8 @@ async function buildServiceWorker(options = {}) {
     },
     define: {
       global: "self",
+      __PRECACHE__: JSON.stringify(options.precache ?? {}),
+      __CACHE_VERSION__: JSON.stringify(options.version ?? "development"),
     },
     plugins: [emptyNodeModulesPlugin],
     minify: isMinify,

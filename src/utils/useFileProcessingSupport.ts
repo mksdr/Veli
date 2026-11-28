@@ -1,25 +1,78 @@
-import { useEffect, useState } from "react";
-import { registerWorker, hasWorkerProtocol } from "./workerSupport";
+import { useEffect, useLayoutEffect, useState } from "react";
+import { useWorkflow } from "../components/WorkflowContext";
+import { registerAppWorker } from "./appWorker";
+import { waitForWorkerControl, watchWorkerProtocol } from "./workerSupport";
 
-export interface FileProcessingSupport {
-  loading: boolean;
-  streaming: boolean;
-}
-
-export default function useFileProcessingSupport(): FileProcessingSupport {
-  const [support, setSupport] = useState<FileProcessingSupport>({ loading: true, streaming: false });
+export default function useFileProcessingSupport(): boolean | null {
+  const [streaming, setStreaming] = useState<boolean | null>(null);
+  const streamingEnabled = streaming === true;
+  const [verifiedWorker, setVerifiedWorker] = useState<ServiceWorker | null>(null);
+  const { busy, dirty, isIdle } = useWorkflow();
   useEffect(() => {
-    let mounted = true;
+    if (streamingEnabled) return;
     const safari = /Safari/.test(navigator.userAgent) && /Apple/.test(navigator.vendor);
     const mobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
-    const canStream = !safari && !mobile && window.isSecureContext &&
-      "serviceWorker" in navigator && typeof ReadableStream !== "undefined";
-    (async () => {
-      const streaming = canStream && await registerWorker(navigator) &&
-        await hasWorkerProtocol(navigator);
-      if (mounted) setSupport({ loading: false, streaming });
-    })();
-    return () => { mounted = false; };
-  }, []);
-  return support;
+    if (safari || mobile || !window.isSecureContext || !("serviceWorker" in navigator) ||
+        typeof ReadableStream === "undefined") {
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- The browser capabilities are available after hydration.
+      setStreaming(false);
+      return;
+    }
+
+    const workers = navigator.serviceWorker;
+    let disposed = false;
+    let activatingWorker: ServiceWorker | null = null;
+    let stopProtocolCheck: (() => void) | undefined;
+    const checkController = () => {
+      stopProtocolCheck?.();
+      stopProtocolCheck = undefined;
+      activatingWorker?.removeEventListener("statechange", checkController);
+      activatingWorker = null;
+      const controller = workers.controller;
+      if (controller?.state !== "activated") {
+        setStreaming(current => current ?? false);
+        if (controller && controller.state !== "redundant") {
+          // The control event can arrive before the client sees the latest worker state.
+          activatingWorker = controller;
+          controller.addEventListener("statechange", checkController);
+        }
+        return;
+      }
+      stopProtocolCheck = watchWorkerProtocol(controller, supported => {
+        if (workers.controller !== controller) return;
+        if (supported) setVerifiedWorker(controller);
+        // On a controlled navigation, select the mode before mounting the file inputs.
+        setStreaming(current => current ?? supported);
+      });
+    };
+    const watchController = () => {
+      if (disposed) return;
+      // A first install can finish after the initial wait for control ends.
+      workers.addEventListener("controllerchange", checkController);
+      checkController();
+    };
+    if (workers.controller) {
+      watchController();
+    } else {
+      // A first visit can accept files while the worker installs in the background.
+      setStreaming(false);
+      void waitForWorkerControl(navigator, 5000, registerAppWorker).then(watchController);
+    }
+    return () => {
+      disposed = true;
+      workers.removeEventListener("controllerchange", checkController);
+      activatingWorker?.removeEventListener("statechange", checkController);
+      stopProtocolCheck?.();
+    };
+  }, [streamingEnabled]);
+
+  useLayoutEffect(() => {
+    if (streaming !== false || busy || dirty || !verifiedWorker || navigator.serviceWorker.controller !== verifiedWorker || !isIdle()) return;
+    // A child may have reported activity in this commit, before the context
+    // snapshot reflects it. Finish an idle transition before the next input.
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- Latch the verified mode before a new file workflow begins.
+    setStreaming(true);
+  }, [streaming, busy, dirty, verifiedWorker, isIdle]);
+
+  return streaming;
 }
